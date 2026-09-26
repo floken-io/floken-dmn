@@ -208,6 +208,32 @@ if (existsSync(dist)) {
   console.log('\u00b7 check:deps(b) \u2014 跳过（dist 尚未构建）');
 }
 
+// 4.5 check:tck —— A 口径（完整 DRG，走 DRG 编排 + typeRef 强制）**必须 100%**。
+// 这是本包的对外承诺，不能只靠手工跑：语料在就必跑（约 4s），不在则跳过（与实证脚本同策略）。
+const TCK_RUN = join(root, 'tooling', 'tck', 'run.mjs');
+const TCK_CORPUS =
+  process.env.TCK_DIR ||
+  join(root, '..', '..', '.workbuddy', '_bpmn-sandbox', 'tck', 'full', 'tck-master', 'TestCases');
+
+if (!existsSync(TCK_CORPUS)) {
+  console.log('\u00b7 check:tck \u2014 \u8df3\u8fc7\uff08\u8bed\u6599\u4e0d\u5728\uff1a' + TCK_CORPUS + '\uff09');
+} else if (!existsSync(TCK_RUN)) {
+  bad('check:tck', 'tck \u8fd0\u884c\u5668\u7f3a\u5931\uff1a' + TCK_RUN);
+} else {
+  try {
+    const out = run(TCK_RUN, ['--json', '--dir', TCK_CORPUS]).toString();
+    const r = JSON.parse(out);
+    if (r.failed > 0 || r.passed !== r.scored) {
+      bad('check:tck', `A \u53e3\u5f84\u672a\u8fbe 100%\uff1a${r.passed}/${r.scored}\uff0c\u5931\u8d25 ${r.failed} \u6761`);
+    } else {
+      ok('check:tck', `A \u53e3\u5f84 ${r.passed}/${r.scored} (${r.pct}%)\uff0cIGNORED ${r.ignored}`);
+    }
+  } catch (e) {
+    bad('check:tck', 'TCK \u8fd0\u884c\u5668\u6267\u884c\u5931\u8d25');
+    console.error((e.stdout?.toString?.() || '') + (e.stderr?.toString?.() || '') + (e.message || ''));
+  }
+}
+
 // 5/6. size / exports — 占位（需 tsup 产物 + publint/attw，详见 06 §6）
 console.log('\u00b7 check:size / check:exports \u2014 完整口径见 06-仓库脚手架与发布约定 §6');
 

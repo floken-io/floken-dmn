@@ -550,7 +550,7 @@ if (errList.length) {
   console.log(`\n模型读入失败 ${errList.length} 条：${[...new Set(errList.map((r) => r.reason))].slice(0, 5).join(' | ')}`);
 }
 console.log('');
-console.log(`IGRONED 口径：仅 label 含 "External Java" 的 0076 组（需真实 Java 类）。`);
+console.log(`IGNORED 口径：仅 label 含 "External Java" 的 0076 组（需真实 Java 类）。`);
 console.log(`★ errorResult="true" **不豁免**：TCK 用它表示「期望错误/未知结果」，实际给 null 或抛错都判通过。`);
 
 /*

@@ -1,7 +1,7 @@
 {
   "name": "floken-dmn",
   "version": "0.0.0",
-  "description": "DMN 1.4 decision engine (DRG + decision tables) for floken",
+  "description": "DMN 1.5 decision engine (DRG + decision tables) for floken",
   "type": "module",
   "sideEffects": false,
   "engines": { "node": ">=22.12" },
@@ -17,6 +17,7 @@
     "build": "tsup",
     "test": "vitest run",
     "verify": "node tooling/verify.mjs",
+    "tck": "node tooling/tck/run.mjs",
     "changeset": "changeset",
     "release": "pnpm build && pnpm verify && changeset publish",
     "prepublishOnly": "pnpm build && pnpm verify"
