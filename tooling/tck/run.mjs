@@ -7,8 +7,9 @@
 //   - **不做浮点容差**：期望 `0.1` 就得是 `0.1`；
 //     但 `xsd:decimal` 期望值按**它自己给出的有效位数**对齐（见 `sameNumber`）——
 //     那不是容差，是尊重 TCK 声明的序列化精度。
-//   - **`errorResult="true"` 的 resultNode 一律 IGNORED**（TCK 自己标注入工豁免），
-//     而不是「抛错就算过」。
+//   - **`errorResult="true"` 的 resultNode 不豁免**（TCK 的「期望错误/未知结果」用例）：
+//     判据是"没算出具体值" —— null 或抛错都算过，**给出具体值才是真错**。
+//     ⚠️ 早期注释曾写成「一律 IGNORED」，与代码不符（2026-09-26 已订正，以代码为准）。
 //
 // A 口径（完整 DMN TCK，走 DRG）≠ `floken-feel` 的 B 口径（FEEL-only）—— 两套数字禁止互相引用。
 //
@@ -272,6 +273,35 @@ for (const lv of levels) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 语料口径统计（NFR-M6：版本与条数**必须实测复算**，不许写死在报告里）
+// ---------------------------------------------------------------------------
+
+/** DMN schema 命名空间 → 版本（模型自身 `namespace` 常是 Trisotech 之类的自定义串，
+ *  **不能**拿它当版本信号 —— 版本只认 xmlns 声明的 schema 命名空间） */
+const DMN_NS_VER = new Map([
+  ['https://www.omg.org/spec/DMN/20180521/MODEL/', 'DMN 1.3'],
+  ['https://www.omg.org/spec/DMN/20191111/MODEL/', 'DMN 1.4'],
+  ['https://www.omg.org/spec/DMN/20230324/MODEL/', 'DMN 1.5'],
+  ['https://www.omg.org/spec/DMN/20240513/MODEL/', 'DMN 1.6'],
+]);
+const nsVer = new Map();
+let disabled = 0; // TCK 自己用 <!-- --> 注释掉、已禁用的 testCase（不计分，但要报出来）
+
+function commentRanges(src) {
+  const out = [];
+  let i = 0;
+  for (;;) {
+    const s = src.indexOf('<!--', i);
+    if (s < 0) break;
+    const e = src.indexOf('-->', s + 4);
+    if (e < 0) { out.push([s, src.length]); break; }
+    out.push([s, e + 3]);
+    i = e + 3;
+  }
+  return out;
+}
+
 const results = [];
 let total = 0, passed = 0, failed = 0, ignored = 0, errored = 0;
 const byLabel = new Map();
@@ -314,7 +344,17 @@ for (const g of groups) {
   };
 
   for (const tf of testFiles) {
-    const tcRoot = kid(parseXml(readFileSync(join(g.dir, tf), 'utf8')), 'testCases');
+    const tcSrc = readFileSync(join(g.dir, tf), 'utf8');
+    /*
+     * ★ 语料里有被 TCK **自己注释掉**的用例（实测 102 条，集中在 0068/0070/0082 等
+     *   CL3 组）。它们不是"我们漏跑"，是官方已禁用 —— 不计分，但必须报出来，
+     *   否则「语料全量 3569 个 resultNode」与「断言总数 3467」的落差无从解释。
+     */
+    const cr = commentRanges(tcSrc);
+    for (const m of tcSrc.matchAll(/<testCase\b[^>]*>/g)) {
+      if (cr.some(([s, e]) => m.index >= s && m.index < e)) disabled += 1;
+    }
+    const tcRoot = kid(parseXml(tcSrc), 'testCases');
     if (!tcRoot) continue;
     const labels = kids(kid(tcRoot, 'labels') ?? tcRoot, 'label').map((l) => l.text ?? '');
     if (LABEL_FILTER && !labels.some((l) => l.includes(LABEL_FILTER)) && !g.name.includes(LABEL_FILTER)) continue;
@@ -331,8 +371,13 @@ for (const g of groups) {
     let index;
     try {
       if (!modelCache.has(dmnFile)) {
+        const mSrc = readFileSync(join(g.dir, dmnFile), 'utf8');
+        for (const m of mSrc.matchAll(/xmlns(?::[\w.-]+)?\s*=\s*"([^"]*)"/g)) {
+          const v = DMN_NS_VER.get(m[1]);
+          if (v) nsVer.set(v, (nsVer.get(v) ?? 0) + 1);
+        }
         modelCache.set(dmnFile, {
-          def: dmn.readDmn(readFileSync(join(g.dir, dmnFile), 'utf8')).definitions,
+          def: dmn.readDmn(mSrc).definitions,
           idx: null,
         });
       }
@@ -430,18 +475,31 @@ for (const g of groups) {
 
 const scored = total - ignored;
 const pct = scored ? ((passed / scored) * 100).toFixed(1) : '0.0';
+const verStr = nsVer.size
+  ? [...nsVer.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}×${v}`).join(', ')
+  : '(未检出 DMN xmlns)';
+/** 判据① 的原料：按 label 的通过情况（判据② 是断言总分；两条都要可观测） */
+const labelRows = [...byLabel.entries()]
+  .map(([k, r]) => ({ label: k, total: r.total, passed: r.passed, ignored: r.ignored }))
+  .sort((a, b) => (a.passed - a.ignored) / a.total - (b.passed - b.ignored) / b.total || b.total - a.total);
 
 if (AS_JSON) {
-  console.log(JSON.stringify({ total, passed, failed, ignored, errored, scored, pct: Number(pct), failures: results.filter((r) => r.status !== 'pass') }, null, 1));
+  console.log(JSON.stringify({
+    total, passed, failed, ignored, errored, scored, pct: Number(pct),
+    disabled, versions: [...nsVer.entries()].sort((a, b) => b[1] - a[1]),
+    labels: labelRows,
+    failures: results.filter((r) => r.status !== 'pass'),
+  }, null, 1));
   process.exit(0);
 }
 
 console.log('=== floken-dmn · DMN TCK（A 口径：完整 DRG）===');
 console.log(`语料：${TCK_DIR}`);
-console.log(`语料版本：DMN 1.5（官方语料实测命名空间 20230324）  获取日期：${new Date().toISOString().slice(0, 10)}`);
+console.log(`语料版本：${verStr}（按模型 xmlns **实测**，${[...nsVer.values()].reduce((s, v) => s + v, 0)} 份模型）  获取日期：${new Date().toISOString().slice(0, 10)}`);
 console.log('');
 console.log(`断言总数 ${total}  通过 ${passed}  失败 ${failed}  IGNORED ${ignored}${errored ? `  模型错误 ${errored}` : ''}`);
 console.log(`计分口径（扣 IGNORED）: ${passed}/${scored} (${pct}%)`);
+console.log(`语料全量 ${total + disabled} = 生效 ${total} + 官方已注释禁用 ${disabled}（禁用不计分）`);
 console.log('');
 
 const failList = results.filter((r) => r.status === 'fail');
@@ -468,3 +526,17 @@ if (errList.length) {
 console.log('');
 console.log(`IGRONED 口径：仅 label 含 "External Java" 的 0076 组（需真实 Java 类）。`);
 console.log(`★ errorResult="true" **不豁免**：TCK 用它表示「期望错误/未知结果」，实际给 null 或抛错都判通过。`);
+
+/*
+ * ★ 判据① 的观测面（此前 `byLabel` 算了却从不打印 —— 等于第二把尺子形同虚设）。
+ *   判据② 是断言总分（上面那行）；判据① 是「按官方 label 不退化」，两者都要看得见。
+ *   基线文件尚未固化（是否把 label 零退化设为 A 口径硬闸门，待定），此处先让数据可观测。
+ */
+const worst = labelRows.filter((r) => r.passed + r.ignored < r.total).slice(0, 15);
+console.log('');
+console.log(`按 label 统计（共 ${labelRows.length} 个；判据① 原料）：`);
+for (const r of worst) {
+  const ok = r.passed + r.ignored;
+  console.log(`  ${String(r.total - ok).padStart(3)}/${String(r.total).padStart(3)} 未过   ${r.label}`);
+}
+if (!worst.length) console.log('  （全部 label 满分）');
