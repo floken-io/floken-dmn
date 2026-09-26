@@ -116,8 +116,18 @@ function readElement(
   path: string,
 ): DmnElement {
   const byName = typeOfElementName(node.localName);
-  // 元素名反查优先：`<decision>` 能直接定到 Decision，不需要依赖父声明
-  let typeName = byName ?? declared;
+  /*
+   * ★ 元素名反查**只在它是父声明类型的后代时**才生效 —— 否则以父声明为准。
+   *
+   * 反例就是 `<decisionService>` 下的 `<inputData href="#…"/>`：它是一个
+   * **DMNElementReference**，而 `inputData` 恰好也是一个**全局类型名**（`InputData`）。
+   * 只按元素名反查会把它读成一个 `InputData` 元素，`href` 随之丢失，
+   * 于是决策服务的 `inputData` 输入整体消失、退化成取全局同名输入
+   * （TCK 0085#013/#014 期望 `"A B"` 却得 `"C A"`）。
+   * 反过来 `<definitions>` 下的 `<inputData>` 声明的是 `drgElement: DRGElement`，
+   * 而 `InputData` 正是 `DRGElement` 的子类型 → 仍按元素名走，不受影响。
+   */
+  let typeName = byName && (!declared || isSubtypeOf(byName, declared)) ? byName : declared;
 
   if (!typeName) {
     // 既不在元素名表里、父也没声明 —— 未知元素

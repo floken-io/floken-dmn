@@ -44,7 +44,7 @@ export function evaluateExpression(
     case 'LiteralExpression': {
       const text = textOf(expr);
       if (!text) return null;
-      const r = evalExpression(text, scope.vars, { id: expr.$id ?? '', path: 'literalExpression.text' });
+      const r = evalExpression(text, scope.vars, { id: expr.$id ?? '', path: 'literalExpression.text' }, scope.index.typeSpecs);
       scope.diagnostics.push(...r.warnings);
       return coerce(r.value);
     }

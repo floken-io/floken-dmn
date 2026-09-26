@@ -195,6 +195,17 @@ function valuesEqual(a, b) {
   return false;
 }
 
+/**
+ * 决策服务**有多个** `outputDecision` 时，它的值是以各输出变量名为键的 context；
+ * 此时 `resultNode@name` 指的是"取其中哪一位"。单个输出时值就是那个值，原样返回。
+ */
+function pickResult(value, name) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const m = value.entries instanceof Map ? value.entries : value;
+  if (m instanceof Map) return m.has(name) ? m.get(name) : value;
+  return Object.prototype.hasOwnProperty.call(m, name) ? m[name] : value;
+}
+
 function show(v) {
   v = normalize(v);
   if (v === null || v === undefined) return 'null';
@@ -287,8 +298,15 @@ for (const g of groups) {
         let actual;
         let thrown = null;
         try {
-          const r = dmn.evaluateDecision(model, name, input, { index });
-          actual = r.value;
+          /*
+           * ★ `testCase@invocableName` 才是**被调对象**（TCK 用它指名要 invoked 的
+           *   决策服务 / BKM），`resultNode@name` 只是"取结果的哪一位"。
+           *   忽略它就会退化成"独立求值那个输出决策" —— 决策服务的入参语义随之消失
+           *   （TCK 0085#002_a 期望"没给入参 → null"，独立求值却会自己算出 "foo bar"）。
+           */
+          const invocable = tc.attrs.invocableName ?? '';
+          const r = dmn.evaluateDecision(model, invocable || name, input, { index });
+          actual = pickResult(r.value, name);
         } catch (e) {
           thrown = e;
         }

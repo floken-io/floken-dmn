@@ -6,10 +6,11 @@
 //  - BKM / DecisionService 绑成**可调用**，其作用域是封闭的（调用方的输入不泄漏进去）。
 //
 // 本实现是同步的（FEEL 求值是同步的），不引入 callback 形态。
+import type { TypeSpec } from 'floken-feel';
 import { DecisionError, DmnModelError, diag, type Diagnostic } from '../core/errors.js';
 import type { DmnElement } from '../xml/reader.js';
 import { isElement } from '../xml/reader.js';
-import { coerceTypeRef, toFeelContext, toFeelFunction } from './feel.js';
+import { buildTypeSpecs, coerceTypeRef, toFeelContext, toFeelFunction } from './feel.js';
 import { evaluateExpression, functionParts, type EvalScope } from './expression.js';
 
 /** 一次求值中的元素记录（NFR-M5：结果可解释） */
@@ -40,6 +41,11 @@ export interface ModelIndex {
   bkms: DmnElement[];
   /** itemDefinition 名 → 定义（typeRef 强制要用：复合类型与集合） */
   itemDefinitions: Map<string, DmnElement>;
+  /**
+   * itemDefinition 名 → FEEL 类型规格（`instance of <itemDefinition 名>` 用）。
+   * 由 `itemDefinitions` 派生，随索引一起建好 —— 求值时不再重算。
+   */
+  typeSpecs: Record<string, TypeSpec>;
 }
 
 function walkAll(root: DmnElement, visit: (el: DmnElement) => void): void {
@@ -76,7 +82,7 @@ export function indexModel(definitions: DmnElement): ModelIndex {
     else if (el.$type === 'BusinessKnowledgeModel') bkms.push(el);
   });
 
-  return { byId, byName, byVariable, decisions, inputData, bkms, itemDefinitions };
+  return { byId, byName, byVariable, decisions, inputData, bkms, itemDefinitions, typeSpecs: buildTypeSpecs(itemDefinitions) };
 }
 
 /** 元素的绑定名：优先变量名，其次元素名，最后 id */
@@ -250,6 +256,13 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
   return value;
 }
 
+/** 元素声明的类型（`variable.typeRef`）；未声明 → undefined */
+function declaredTypeRef(el: DmnElement): string | undefined {
+  const v = el.variable;
+  const t = isElement(v) ? v.typeRef : undefined;
+  return typeof t === 'string' && t !== '' ? t : undefined;
+}
+
 /** 取某元素上按 `href` 引用的元素列表（`outputDecision` / `inputData` / … 都可能重复出现） */
 function refsOf(el: DmnElement, key: string, run: Run): DmnElement[] {
   const v = el[key];
@@ -308,22 +321,46 @@ function runDecisionService(
   const local: Record<string, unknown> = { ...vars };
 
   const inputs = [...refsOf(ds, 'inputData', run), ...refsOf(ds, 'inputDecision', run)];
+
+  /*
+   * ★ **形参个数必须恰好相等**（DMN 1.5 §7.3：`inputData` + `inputDecision` 就是决策服务的形参表）。
+   *   - 多给（`decisionService_005("bar")`，DS 无形参）→ 调用不适用 → `null`（TCK 0085#005）；
+   *   - 少给（`decisionService_008()`，DS 要一个）→ 同样 `null`（TCK 0085#008）。
+   *   不是"忽略多余的 / 自己去算缺失的" —— 那两种宽容处理会把本该失败的输入
+   *   悄悄算出来，错误反而被掩盖。
+   */
+  if (args && args.length !== inputs.length) return null;
+
   for (const [i, el] of inputs.entries()) {
     const name = resultName(el);
     if (!name) continue;
-    if (args && i < args.length) {
-      local[name] = args[i];
+    const declared = declaredTypeRef(el);
+    if (args) {
+      const raw = args[i];
+      const v = declared ? coerceTypeRef(raw, declared, { id: el.$id ?? '' }, run.index) : raw;
+      /*
+       * ★ 实参**类型不符** → 整个调用不适用（TCK 0085#007：给 string 形参传 `123`）。
+       *   注意与"实参本来就是 null"区分：null 是一等合法值，不做拦截。
+       */
+      if (declared && raw !== null && v === null) return null;
+      local[name] = v === undefined ? null : v;
+      continue;
+    }
+    /*
+     * ★ 决策服务**作为可调用对象**求值时，入参只来自**调用上下文**（实参 / 宿主输入）。
+     *   缺口**不回退到"自己算那个决策"** —— `inputDecision` 在这里是**形参**，
+     *   没给就是没给：TCK 0085#002_a 明确期望 `null`（"requires decision_002_input
+     *   but we're not providing it"），而回退求值会算出它自带的 `"bar"` → `"foo bar"`。
+     */
+    if (name in local) {
+      local[name] = declared ? coerceTypeRef(local[name], declared, { id: el.$id ?? '' }, run.index) : local[name];
       continue;
     }
     if (name in run.input) {
-      local[name] = run.input[name];
+      local[name] = declared ? coerceTypeRef(run.input[name], declared, { id: el.$id ?? '' }, run.index) : run.input[name];
       continue;
     }
-    if (el.$type === 'InputData') {
-      run.diagnostics.push(diag('DMN_DIAG_MISSING_INPUT', `输入数据未提供值：${name}`, { node: { id: el.$id ?? '' } }));
-      continue;
-    }
-    local[name] = runDecision(el, local, run, definitions);
+    local[name] = null;
   }
 
   // 被封装的决策先求一遍（它们不进结果，但要让 outputDecision 的 requirement 能拿到 local 作用域）
@@ -379,13 +416,28 @@ function resolveRequirements(el: DmnElement, vars: Record<string, unknown>, run:
     }
     if (target.$type === 'InputData') {
       const name = resultName(target);
-      // ★ 缺席的输入**不写进作用域** —— 否则会遮蔽 FEEL 环境里的同名变量
-      if (name in run.input) vars[name] = run.input[name];
-      else if (!(name in vars)) {
+      /*
+       * ★ **上层已经给了值就不覆盖**。
+       *   决策服务的 `inputData` 由**调用实参**钉死（TCK 0085#013：
+       *   `decisionService_013("A","B")` 里 `"A"` 给 `inputData_013_1`），
+       *   而全局 `run.input` 里同名键是 `"C"` —— 用全局值回写会把实参冲掉。
+       * 缺席的输入**不写进作用域** —— 否则会遮蔽 FEEL 环境里的同名变量。
+       */
+      if (name in vars) continue;
+      /*
+       * ★ **输入数据也要按 `variable.typeRef` 强制**（DMN 1.5 §10.3.2 的隐式转换）：
+       *   TCK 0082 `decisionService_002` 给 string 形参传 `10`，期望输入被强制成 null。
+       *   只在决策表/输出的那一侧做强制是不够的 —— 输入进作用域的这一步就得做。
+       */
+      if (name in run.input) {
+        const declared = declaredTypeRef(target);
+        vars[name] = declared
+          ? coerceTypeRef(run.input[name], declared, { id: target.$id ?? '' }, run.index)
+          : run.input[name];
+      } else
         run.diagnostics.push(
           diag('DMN_DIAG_MISSING_INPUT', `输入数据未提供值：${name}`, { node: { id: target.$id ?? '' } }),
         );
-      }
       continue;
     }
     if (target.$type === 'BusinessKnowledgeModel') {
@@ -404,7 +456,12 @@ function resolveRequirements(el: DmnElement, vars: Record<string, unknown>, run:
         ...refsOf(target, 'inputData', run),
         ...refsOf(target, 'inputDecision', run),
       ].map(resultName);
-      const f = toFeelFunction(name, (...args) => fn(...args) as never);
+      /*
+       * ★ 形参名要挂到**函数值**上（`FeelFunction.params`），不只挂 `$args`：
+       *   FEEL 的命名调用（`decisionService_012(decision_012_3: "C", …)`）在求值器里
+       *   按形参名对位，而它只认函数值自带的那份（TCK 0085#009/#012）。
+       */
+      const f = toFeelFunction(name, (...args) => fn(...args) as never, params);
       Object.defineProperty(f, '$args', { value: params, enumerable: false });
       vars[name] = f;
       continue;
@@ -470,7 +527,7 @@ function makeInvocable(bkm: DmnElement, run: Run, definitions: DmnElement): unkn
    * ★ 同理必须包成 **FEEL 函数值**：FEEL 的 `call` 用 `isFunction()` 判定，
    * 裸 JS 函数会被当成"不是函数"（TCK 0092 `bkm_003_1()(4)` 挂在这一点上）。
    */
-  const f = toFeelFunction(resultName(bkm), (...args) => fn(...args) as never);
+  const f = toFeelFunction(resultName(bkm), (...args) => fn(...args) as never, params);
   Object.defineProperty(f, '$args', { value: params, enumerable: false });
   /*
    * ★ 函数缓存的键**必须**与 `run.results` 的决策值缓存分开：

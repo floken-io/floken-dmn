@@ -4,7 +4,7 @@
 //  1. 把字符串 + 变量字典交给 `floken-feel`（边界第 2 条：不许把 dmn 元素对象塞进去）；
 //  2. 把 `floken-feel` 的结构化错误包装成 `DMN_EVAL_FEEL`（保留 cause，不吞异常 —— §5.6）；
 //  3. DMN `typeRef` → FEEL 值的类型强制（决策表输入/输出列的声明类型）。
-import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic } from 'floken-feel';
+import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic, type TypeSpec } from 'floken-feel';
 import { DecisionError, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
 
@@ -45,9 +45,14 @@ function toDiagnostics(warnings: readonly FeelDiagnostic[] | undefined): Diagnos
  *    （带 `node` 定位与 `cause`，不吞、不转 null —— NFR-M4）；
  *  - **语义降级**（变量缺失等）随 `warnings` 返回，不抛。
  */
-export function evalExpression(src: string, context: Record<string, unknown>, node?: { id?: string; path?: string }): FeelOutcome {
+export function evalExpression(
+  src: string,
+  context: Record<string, unknown>,
+  node?: { id?: string; path?: string },
+  types?: Record<string, TypeSpec>,
+): FeelOutcome {
   try {
-    const r = evaluate(src, context);
+    const r = evaluate(src, context, types ? { types } : {});
     return { value: r.value, warnings: toDiagnostics(r.warnings) };
   } catch (e) {
     throw new DecisionError({
@@ -65,9 +70,15 @@ export function evalExpression(src: string, context: Record<string, unknown>, no
  * 求值一条 unary tests（决策表输入条目）。被验值绑在 `?` 上。
  * @returns `true` 命中；`false` 不命中；`null` = 未知（三值逻辑，不是错误 —— §5.6）
  */
-export function evalUnaryTests(src: string, value: unknown, context: Record<string, unknown>, node?: { id?: string; path?: string }): { value: boolean | null; warnings: Diagnostic[] } {
+export function evalUnaryTests(
+  src: string,
+  value: unknown,
+  context: Record<string, unknown>,
+  node?: { id?: string; path?: string },
+  types?: Record<string, TypeSpec>,
+): { value: boolean | null; warnings: Diagnostic[] } {
   try {
-    const r = unaryTest(src, { ...context, '?': value });
+    const r = unaryTest(src, { ...context, '?': value }, types ? { types } : {});
     return { value: r.value === true ? true : r.value === false ? false : null, warnings: toDiagnostics(r.warnings) };
   } catch (e) {
     throw new DecisionError({
@@ -335,6 +346,78 @@ function tryBaseCoercion(value: unknown, typeRef: string): unknown {
 /** 类型强制需要的模型信息（只有 itemDefinition 表，保持窄接口） */
 export interface TypeIndex {
   itemDefinitions?: Map<string, DmnElement>;
+}
+
+// --------------------------------------------------------------------------
+// itemDefinition 表 → FEEL 类型规格表（`instance of <itemDefinition 名>` 用）
+// --------------------------------------------------------------------------
+
+/** 自引用保护上限（itemDefinition 可以互相指向） */
+const MAX_SPEC_DEPTH = 8;
+
+const ANY_SPEC: TypeSpec = { kind: 'named', name: 'Any', start: 0, end: 0 };
+
+/**
+ * 把模型的 `itemDefinition` 表翻译成 `floken-feel` 的**类型规格表**。
+ *
+ * `instance of t255` / `instance of tNumberList` 这类表达式只有在拿到模型定义时才判得
+ * 了 —— 名字对 FEEL 而言只是一个 `named` 规格，查表在宿主手里（TCK 0070 整组靠它）。
+ *
+ * 三条口径（都由 TCK 0070 钉死）：
+ *  ① **`allowedValues` 不参与类型判定**（`number_013`：`256 instance of t255` → true，
+ *     尽管 256 不在 `[0..255]` 里；`string_013` 同理）—— 故这里**根本不读**这两个属性；
+ *  ② `isCollection="true"` → `list<内层>`，`[] instance of tAnyList` 靠这条成立
+ *     （`list_014_a`：空列表对每个元素类型都成立）；
+ *  ③ `itemComponent` → `context<…>`；`functionItem` → `function<…>`。
+ *
+ * 查不到的名字按 `named` 交给 FEEL：它先查内建类型（`number`/`string`/`Any`…），
+ * 再查本表，都落空才判 `false`。
+ */
+export function buildTypeSpecs(itemDefinitions: Map<string, DmnElement>): Record<string, TypeSpec> {
+  const out: Record<string, TypeSpec> = {};
+  for (const [name, def] of itemDefinitions) out[name] = specOfItemDefinition(def, itemDefinitions, 0);
+  return out;
+}
+
+function specOfItemDefinition(
+  def: DmnElement,
+  table: Map<string, DmnElement>,
+  depth: number,
+): TypeSpec {
+  if (depth > MAX_SPEC_DEPTH) return ANY_SPEC;
+
+  // `functionItem` 声明的是**函数类型**：`outputTypeRef` 是结果类型
+  const fnItem = def.functionItem;
+  if (isElement(fnItem)) {
+    const output = typeof fnItem.outputTypeRef === 'string' && fnItem.outputTypeRef ? fnItem.outputTypeRef : '';
+    return { kind: 'function', result: output ? resolveRef(output, table, depth) : null, start: 0, end: 0 };
+  }
+
+  const components = (Array.isArray(def.itemComponent) ? def.itemComponent : def.itemComponent ? [def.itemComponent] : []).filter(
+    (c): c is DmnElement => isElement(c),
+  );
+  let inner: TypeSpec;
+  if (components.length > 0) {
+    const entries: { key: string; type: TypeSpec }[] = [];
+    for (const c of components) {
+      const key = typeof c.name === 'string' ? c.name : '';
+      if (!key) continue;
+      const ref = typeof c.typeRef === 'string' && c.typeRef ? c.typeRef : '';
+      entries.push({ key, type: ref ? resolveRef(ref, table, depth) : ANY_SPEC });
+    }
+    inner = { kind: 'context', entries, start: 0, end: 0 };
+  } else {
+    const ref = typeof def.typeRef === 'string' && def.typeRef ? def.typeRef : '';
+    inner = ref ? resolveRef(ref, table, depth) : ANY_SPEC;
+  }
+
+  return def.isCollection === true ? { kind: 'list', item: inner, start: 0, end: 0 } : inner;
+}
+
+/** 一个 `typeRef` 字符串 → 类型规格：先查模型表（可递归），否则交给 FEEL 的 `named` */
+function resolveRef(ref: string, table: Map<string, DmnElement>, depth: number): TypeSpec {
+  const def = table.get(ref);
+  return def ? specOfItemDefinition(def, table, depth + 1) : { kind: 'named', name: ref, start: 0, end: 0 };
 }
 
 /** 各基本类型的转换表达式（`v` 是被转换值） */
