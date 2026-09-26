@@ -191,7 +191,17 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
   // 决策服务不是"带表达式的元素"，它的值是**它那些 outputDecision 的值**
   if (decision.$type === 'DecisionService') {
     run.visiting.delete(id);
-    return runDecisionService(decision, vars, run, definitions);
+    const raw = runDecisionService(decision, vars, run, definitions);
+    /*
+     * ★ 决策服务的**值**也要按 `variable.typeRef` 强制一次 —— 与决策/BKM 同一条规则。
+     * 只强制输出决策自己那层是不够的：TCK 1157 的 `To Singleton List DS` 声明
+     * `functionReturningDateList`，输出决策的值是 `date("2000-01-02")` → 期望 `[…]`；
+     * `From Singleton List DS` 声明 `functionReturningDate`，值却是单例列表 → 期望标量。
+     */
+    const declared = isElement(decision.variable) ? decision.variable.typeRef : undefined;
+    return typeof declared === 'string' && declared !== ''
+      ? coerceTypeRef(raw, declared, { id }, run.index)
+      : raw;
   }
 
   resolveRequirements(decision, vars, run, definitions);

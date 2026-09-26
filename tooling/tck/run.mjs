@@ -67,8 +67,13 @@ function parseXml(src) {
     const tok = m[0];
     // ★ 标签之间的文本 —— 缺了这一步，`<value>100</value>` 会被读成空串
     if (m.index > last) {
-      const raw = src.slice(last, m.index).trim();
-      if (raw) stack[stack.length - 1].text += dec(raw);
+      const seg = src.slice(last, m.index);
+      const node = stack[stack.length - 1];
+      // ★ `raw` = **未裁剪**原文：字符串期望值的尾随空格是值的一部分
+      //   （TCK 1103#008 期望一个空格、1105#007 期望 `"XYZ "`），只留 `text` 会丢。
+      node.raw = (node.raw ?? '') + dec(seg);
+      const raw = seg.trim();
+      if (raw) node.text += dec(raw);
     }
     last = m.index + tok.length;
     if (tok.startsWith('<!--') || tok.startsWith('<?') || tok.startsWith('<!DOCTYPE')) continue;
@@ -118,7 +123,15 @@ function valueOf(vt) {
   const v = kid(vt, 'value');
   if (v) {
     if (v.attrs['xsi:nil'] === 'true') return null;
-    return scalarOf((v.text ?? '').trim(), v.attrs['xsi:type']);
+    /*
+     * ★ 字符串期望值**不能 trim**：尾随空格是值的一部分。
+     *   TCK 1103#008 期望 `<value xsi:type="xsd:string"> </value>`（一个空格），
+     *   1105#007 期望 `"XYZ "` —— 一律 trim 会把它们压成 `""` / `"XYZ"`。
+     *   其余类型（数字 / 布尔 / 时间）走 trim，那是为了吃掉 XML 缩进。
+     */
+    const t = (v.attrs['xsi:type'] ?? '').replace(/^xsd:/, '');
+    const text = t === 'string' ? (v.raw ?? v.text ?? '') : (v.text ?? '');
+    return scalarOf(text, v.attrs['xsi:type']);
   }
   const comps = kids(vt, 'component');
   if (comps.length) {
