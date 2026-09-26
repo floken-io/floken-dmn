@@ -93,10 +93,21 @@ export function resultName(el: DmnElement): string {
   return typeof el.$id === 'string' ? el.$id : '';
 }
 
-/** `href="#id"` → id */
+/**
+ * `href="#id"` / `href="<namespace>#id"` / `href="id"` → id。
+ *
+ * ★ **本地限定 href**：DMN 允许用「本模型命名空间 + `#` + id」的完整形式引用本模型的
+ *   元素（TCK 0091 整组就是这样写的，且它**没有** `<import>`）。只认 `#` 前缀会把
+ *   `http://…/0091-local-hrefs#_decision_001` 整串当 id 用，于是引用落空 → 抛
+ *   `DMN_MODEL_MISSING_REFERENCE`。
+ *   跨命名空间的那一段（真正指向 `<import>` 的）同样先取出 `#` 后的 id ——
+ *   能否找到取决于导入模型是否已并入索引，与本函数无关。
+ */
 export function hrefId(href: unknown): string | null {
   if (typeof href !== 'string') return null;
-  return href.startsWith('#') ? href.slice(1) : href;
+  const i = href.indexOf('#');
+  if (i < 0) return href;
+  return href.slice(i + 1);
 }
 
 interface Run {
