@@ -1,0 +1,203 @@
+{
+ "total": 3467,
+ "passed": 3437,
+ "failed": 12,
+ "ignored": 18,
+ "errored": 0,
+ "scored": 3449,
+ "pct": 99.7,
+ "failures": [
+  {
+   "group": "0008-LX-arithmetic",
+   "key": "0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml#002/payment",
+   "status": "fail",
+   "expected": "562.707359373292",
+   "actual": "562.70735937327"
+  },
+  {
+   "group": "0008-LX-arithmetic",
+   "key": "0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml#003/payment",
+   "status": "fail",
+   "expected": "2861.03377700389",
+   "actual": "2861.0337770039014"
+  },
+  {
+   "group": "0009-invocation-arithmetic",
+   "key": "0009-invocation-arithmetic/0009-invocation-arithmetic-test-01.xml#002/MonthlyPayment",
+   "status": "fail",
+   "expected": "662.707359373292",
+   "actual": "662.70735937327"
+  },
+  {
+   "group": "0009-invocation-arithmetic",
+   "key": "0009-invocation-arithmetic/0009-invocation-arithmetic-test-01.xml#003/MonthlyPayment",
+   "status": "fail",
+   "expected": "2961.03377700389",
+   "actual": "2961.0337770039014"
+  },
+  {
+   "group": "0003-iteration",
+   "key": "0003-iteration/0003-iteration-test-01.xml#001/MonthlyPayment",
+   "status": "fail",
+   "expected": "[966.396742204988, 376.509070632494]",
+   "actual": "[966.3967422049851, 376.5090706324971]"
+  },
+  {
+   "group": "0004-lending",
+   "key": "0004-lending/0004-lending-test-01.xml#001/RequiredMonthlyInstallment",
+   "status": "fail",
+   "expected": "1680.880325608555",
+   "actual": "1680.880325608626"
+  },
+  {
+   "group": "0005-literal-invocation",
+   "key": "0005-literal-invocation/0005-literal-invocation-test-01.xml#002/MonthlyPayment",
+   "status": "fail",
+   "expected": "662.707359373292",
+   "actual": "662.70735937327"
+  },
+  {
+   "group": "0005-literal-invocation",
+   "key": "0005-literal-invocation/0005-literal-invocation-test-01.xml#003/MonthlyPayment",
+   "status": "fail",
+   "expected": "2961.03377700389",
+   "actual": "2961.0337770039014"
+  },
+  {
+   "group": "0014-loan-comparison",
+   "key": "0014-loan-comparison/0014-loan-comparison-test-01.xml#001/RankedProducts",
+   "status": "fail",
+   "expected": "{metricsTable: [{lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}], rankByDownPmt: [{lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}], rankByMonthlyPmt: [{lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}], rankByEquityPct: [{lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}]}",
+   "actual": "{metricsTable: [{lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.8474697691113, equity36moPct: 0.1229130806675854}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.5158077647138, equity36moPct: 0.1137029731874609}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.6815658998635, equity36moPct: 0.1219807467513803}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.3183537092757, equity36moPct: 0.115429800731524}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.4098900057274, equity36moPct: 0.1219478687825962}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257371, equity36moPct: 0.1207829702481508}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.5455983131835, equity36moPct: 0.1200230251545736}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.9755138452758, equity36moPct: 0.1160760438900083}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.1944297345801, equity36moPct: 0.1261025270361092}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.8632190043604, equity36moPct: 0.1238778822515131}], rankByDownPmt: [{lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.8474697691113, equity36moPct: 0.1229130806675854}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.1944297345801, equity36moPct: 0.1261025270361092}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.6815658998635, equity36moPct: 0.1219807467513803}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.8632190043604, equity36moPct: 0.1238778822515131}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.4098900057274, equity36moPct: 0.1219478687825962}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257371, equity36moPct: 0.1207829702481508}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.5455983131835, equity36moPct: 0.1200230251545736}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.9755138452758, equity36moPct: 0.1160760438900083}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.5158077647138, equity36moPct: 0.1137029731874609}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.3183537092757, equity36moPct: 0.115429800731524}], rankByMonthlyPmt: [{lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.3183537092757, equity36moPct: 0.115429800731524}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.4098900057274, equity36moPct: 0.1219478687825962}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257371, equity36moPct: 0.1207829702481508}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.5455983131835, equity36moPct: 0.1200230251545736}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.9755138452758, equity36moPct: 0.1160760438900083}, {lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.1944297345801, equity36moPct: 0.1261025270361092}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.8632190043604, equity36moPct: 0.1238778822515131}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.5158077647138, equity36moPct: 0.1137029731874609}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.6815658998635, equity36moPct: 0.1219807467513803}, {lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.8474697691113, equity36moPct: 0.1229130806675854}], rankByEquityPct: [{lenderName: \"Home Loans Today\", rate: 0.0325, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.1944297345801, equity36moPct: 0.1261025270361092}, {lenderName: \"AimLoan\", rate: 0.0325, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.8632190043604, equity36moPct: 0.1238778822515131}, {lenderName: \"Oceans Capital\", rate: 0.035, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.8474697691113, equity36moPct: 0.1229130806675854}, {lenderName: \"eClickLending\", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.6815658998635, equity36moPct: 0.1219807467513803}, {lenderName: \"Home Loans Today\", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.4098900057274, equity36moPct: 0.1219478687825962}, {lenderName: \"Sebonic\", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257371, equity36moPct: 0.1207829702481508}, {lenderName: \"AimLoan\", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.5455983131835, equity36moPct: 0.1200230251545736}, {lenderName: \"eRates Mortgage\", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.9755138452758, equity36moPct: 0.1160760438900083}, {lenderName: \"AimLoan\", rate: 0.03, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.3183537092757, equity36moPct: 0.115429800731524}, {lenderName: \"eClick Lending\", rate: 0.032, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.5158077647138, equity36moPct: 0.1137029731874609}]}"
+  },
+  {
+   "group": "0021-singleton-list",
+   "key": "0021-singleton-list/0021-singleton-list-test-01.xml#001/decision5",
+   "status": "fail",
+   "expected": "\"BOB\"",
+   "actual": "null"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#boxed_001/boxed_001",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#incorrect_001/incorrect_001",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#incorrect_002/incorrect_002",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#incorrect_003/incorrect_003",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_001/literal_001",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_002/literal_002",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_003/literal_003",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_004/literal_004",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_005/literal_005",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_006/literal_006",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_007/literal_007",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_007_a/literal_007_a",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_008/literal_008",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_009/literal_009",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_010/literal_010",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_011/literal_011",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#literal_012/literal_012",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0076-feel-external-java",
+   "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#varargs_001/varargs_001",
+   "status": "ignored",
+   "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
+  },
+  {
+   "group": "0082-feel-coercion",
+   "key": "0082-feel-coercion/0082-feel-coercion-test-01.xml#fd_002/fd_002",
+   "status": "fail",
+   "expected": "null（errorResult）",
+   "actual": "\"foo\""
+  },
+  {
+   "group": "0100-arithmetic",
+   "key": "0100-arithmetic/0100-arithmetic-test-01.xml#exponent_lhs_number_exp_rhs_number_005/exponent_lhs_number_exp_rhs_number_005",
+   "status": "fail",
+   "expected": "60.58617166606",
+   "actual": "60.58617166606632"
+  }
+ ]
+}
