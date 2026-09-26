@@ -120,6 +120,12 @@ interface Run {
   input: Record<string, unknown>;
   /** 默认表达式语言（definitions 的 expressionLanguage） */
   expressionLanguage?: string | undefined;
+  /**
+   * ★ >0 时**绕过** `results` 缓存（既不读也不写）。
+   * 决策服务**带实参**调用时，它的输出决策必须按当次实参重算 ——
+   * 详见 `runDecisionService` 里的说明（TCK 0092）。
+   */
+  fresh: number;
 }
 
 /**
@@ -152,6 +158,7 @@ export function evaluateDecision(
     diagnostics: [],
     input: { ...input },
     ...(el === undefined ? {} : { expressionLanguage: el }),
+    fresh: 0,
   };
 
   const value = runDecision(target, { ...run.input }, run, definitions);
@@ -189,7 +196,7 @@ function scopeOf(run: Run, definitions: DmnElement, vars: Record<string, unknown
 
 function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: Run, definitions: DmnElement): unknown {
   const id = decision.$id ?? '';
-  if (run.results.has(id)) return run.results.get(id);
+  if (run.fresh === 0 && run.results.has(id)) return run.results.get(id);
   if (run.visiting.has(id)) {
     throw new DecisionError({
       code: 'DMN_EVAL_CIRCULAR',
@@ -247,7 +254,7 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
       result: value,
     };
     run.trace.push(bkmEntry);
-    run.results.set(id, value);
+    if (run.fresh === 0) run.results.set(id, value);
     return value;
   }
 
@@ -273,7 +280,7 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
   run.visiting.delete(id);
   entry.result = value;
   run.trace.push(entry);
-  run.results.set(id, value);
+  if (run.fresh === 0) run.results.set(id, value);
   return value;
 }
 
@@ -384,22 +391,38 @@ function runDecisionService(
     local[name] = null;
   }
 
-  // 被封装的决策先求一遍（它们不进结果，但要让 outputDecision 的 requirement 能拿到 local 作用域）
-  for (const el of refsOf(ds, 'encapsulatedDecision', run)) {
-    const name = resultName(el);
-    if (name && !(name in local)) local[name] = runDecision(el, local, run, definitions);
-  }
+  /*
+   * ★ **带实参调用必须绕过结果缓存**（TCK 0092 decision_013_1）。
+   *
+   *   `bkm_013_1(decisionService_013_1, decisionService_013_1)` 的 body 是
+   *   `fn1(5)*fn2(10)` —— 同一个决策服务被带**不同实参**调了两次。
+   *   而 `run.results` 是按**元素 id** 记忆的：不绕过的话 `fn2(10)` 读到的是
+   *   `fn1(5)` 那次缓存下来的 50，于是得 2500 而不是 5000。
+   *
+   *   只有带实参（`args !== undefined`）才绕过：决策服务**当值引用**（无参）时
+   *   仍是一次求值，照旧走缓存。
+   */
+  run.fresh += args === undefined ? 0 : 1;
+  try {
+    // 被封装的决策先求一遍（它们不进结果，但要让 outputDecision 的 requirement 能拿到 local 作用域）
+    for (const el of refsOf(ds, 'encapsulatedDecision', run)) {
+      const name = resultName(el);
+      if (name && !(name in local)) local[name] = runDecision(el, local, run, definitions);
+    }
 
-  const outs = refsOf(ds, 'outputDecision', run);
-  const values = outs.map((o) => runDecision(o, local, run, definitions));
-  if (outs.length === 1) return values[0] ?? null;
+    const outs = refsOf(ds, 'outputDecision', run);
+    const values = outs.map((o) => runDecision(o, local, run, definitions));
+    if (outs.length === 1) return values[0] ?? null;
 
-  const ctx: Record<string, unknown> = {};
-  for (const [i, o] of outs.entries()) {
-    const name = resultName(o);
-    if (name) ctx[name] = values[i] ?? null;
+    const ctx: Record<string, unknown> = {};
+    for (const [i, o] of outs.entries()) {
+      const name = resultName(o);
+      if (name) ctx[name] = values[i] ?? null;
+    }
+    return toFeelContext(ctx);
+  } finally {
+    run.fresh -= args === undefined ? 0 : 1;
   }
-  return toFeelContext(ctx);
 }
 
 /** 解析 informationRequirement / knowledgeRequirement，把结果绑进 `vars` */
