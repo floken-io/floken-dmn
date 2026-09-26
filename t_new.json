@@ -1,7 +1,7 @@
 {
  "total": 3467,
- "passed": 3399,
- "failed": 50,
+ "passed": 3401,
+ "failed": 48,
  "ignored": 18,
  "errored": 0,
  "scored": 3449,
@@ -118,20 +118,6 @@
    "status": "fail",
    "expected": "\"BOB\"",
    "actual": "null"
-  },
-  {
-   "group": "0030-user-defined-functions",
-   "key": "0030-user-defined-functions/0030-user-defined-functions-test-01.xml#001/named function invocation",
-   "status": "fail",
-   "expected": "\"#feel#feel\"",
-   "actual": "null"
-  },
-  {
-   "group": "0031-user-defined-functions",
-   "key": "0031-user-defined-functions/0031-user-defined-functions-test-01.xml#002/fn invocation named parameters",
-   "status": "fail",
-   "expected": "{subResult: 5, subResultMixed: -5, divisionResultNamed: 2, multiplicationResultNamed: 50}",
-   "actual": "{subResult: 5, multiplicationResultNamed: null, subResultMixed: -5, divisionResultNamed: 2}"
   },
   {
    "group": "0040-singlenestedcontext",

@@ -338,8 +338,17 @@ function makeFunction(expr: DmnElement, scope: EvalScope): unknown {
    * 于是 `decision_002_2(3)` 只会得到 `'decision_002_2' is not a function`
    * （TCK 0092-feel-lambda 整组挂在这一点上）。
    */
-  const f = toFeelFunction('', (...args) => fn(...args) as never);
-  // 形参名留给命名实参映射（当前 FEEL 侧尚未消费，先挂上以便后续对齐）
+  /*
+   * ★ 形参名要**同时**给 `toFeelFunction` 的第三参（`FeelFunction.params`）和 `$args`：
+   *   FEEL 的**命名调用**在求值器里按形参名对位，而它只认函数值自带的那份 `params`；
+   *   DMN 侧的 `<invocation><binding parameter=…>` 则读 `$args` 重排。
+   *   两头都要，缺一头 `f(a: 1, b: 2)` 就对不上位 → null。
+   *
+   *   TCK 0030「named function invocation」与 0031「fn invocation named parameters」
+   *   的 `multiplyFn` 都是**装箱 `<functionDefinition>`**（不是 FEEL 的 `function(a,b)`
+   *   字面量，字面量的形参名走另一条路已通），此前正是漏了这两个参数的其中一头。
+   */
+  const f = toFeelFunction('', (...args) => fn(...args) as never, params);
   Object.defineProperty(f, '$args', { value: params, enumerable: false });
   return f;
 }
