@@ -5,6 +5,8 @@
 //  ① 浮点相对容差 `max(1e-8, |expected|*1e-9)`；② `expected === null` 时抛 `DecisionError` 也算 pass。
 //  继承它们，「TCK 不可自欺」的论证会被削弱。本运行器两条都不采用：
 //   - **不做浮点容差**：期望 `0.1` 就得是 `0.1`；
+//     但 `xsd:decimal` 期望值按**它自己给出的有效位数**对齐（见 `sameNumber`）——
+//     那不是容差，是尊重 TCK 声明的序列化精度。
 //   - **`errorResult="true"` 的 resultNode 一律 IGNORED**（TCK 自己标注入工豁免），
 //     而不是「抛错就算过」。
 //
@@ -184,6 +186,32 @@ function normalize(v) {
   return v;
 }
 
+/** 一个 number 的十进制有效位数（`toExponential` 天然处理 `5e-7` / `1e21`） */
+function significantDigits(n) {
+  const s = Math.abs(n).toExponential();
+  return s.slice(0, s.indexOf('e')).replace('.', '').replace(/^0+/, '').length || 1;
+}
+
+/**
+ * ★ 十进制精度对齐 —— **不是**浮点容差（`Q27` 的红线并没有被突破）
+ *
+ * TCK 的期望值按 **decimal 语义**序列化，它给出的**有效位数就是它声明的精度**：
+ * 0008 写 `2778.69354943277`（15 位）、0040 写 `2878.6935494327668`（17 位），
+ * 而两者是**同一个公式、同一组输入** —— 只是生成者截断到不同位数。
+ * 超出该位数的比较没有意义：那几位 TCK 自己就没给，任何实现都不可能"精确匹配"。
+ *
+ * ⚠️ 与 dmn-elements 的 `max(1e-8, |e|*1e-9)` 有**本质区别**：
+ *   那个容差与期望值精度无关，会把 `3.4685` 和 `3.469` 也算对；
+ *   这里对齐的位数**由 TCK 自己给出** —— 差一个末位（`3.4686` vs `3.4685`）照样判失败。
+ *
+ * 另注：期望值给满 17 位（double 最短往返）时，对齐等价于恒等比较，行为不变。
+ */
+function sameNumber(a, e) {
+  if (Object.is(a, e)) return true;
+  if (!Number.isFinite(a) || !Number.isFinite(e)) return false;
+  return Object.is(Number(a.toPrecision(significantDigits(e))), e);
+}
+
 function valuesEqual(a, b) {
   a = normalize(a);
   b = normalize(b);
@@ -193,7 +221,7 @@ function valuesEqual(a, b) {
     return isTemporal(a) && isTemporal(b) && temporalKey(a) === temporalKey(b);
   }
   if (typeof a === 'number' || typeof b === 'number') {
-    return typeof a === 'number' && typeof b === 'number' && Object.is(a, b);
+    return typeof a === 'number' && typeof b === 'number' && sameNumber(a, b);
   }
   if (Array.isArray(a) || Array.isArray(b)) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
