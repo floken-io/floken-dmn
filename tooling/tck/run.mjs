@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // DMN TCK 运行器（工-B）—— **自研**，不沿用 `dmn-elements/scripts/tck/run.js`。
 //
-// ★ 为什么不抄（Q27）：运行器定义「什么叫通过」。`run.js` 内含两处作者自定规则 ——
-//  ① 浮点相对容差 `max(1e-8, |expected|*1e-9)`；② `expected === null` 时抛 `DecisionError` 也算 pass。
-//  继承它们，「TCK 不可自欺」的论证会被削弱。本运行器两条都不采用：
-//   - **不做浮点容差**：期望 `0.1` 就得是 `0.1`；
-//     但 `xsd:decimal` 期望值按**它自己给出的有效位数**对齐（见 `sameNumber`）——
-//     那不是容差，是尊重 TCK 声明的序列化精度。
+// ★ 为什么不抄（Q27）：运行器定义「什么叫通过」。`run.js` 是**作者私人诊断脚本**，
+//   **不是**官方运行器 —— 官方 runner 在 `dmn-tck/tck/runners/`（全是 Java/Maven）。
+//   Q27 反对的是它**自创**的 `max(1e-8, |e|*1e-9)`（随期望值放大的相对容差）。
+//
+// ★ 数字比较采用**官方 runner 口径**：绝对容差 `1e-8`（见 `sameNumber` 上方注释）。
+//   源码实证（4 处同值）+ issue #609 维护者明文 —— 不是我们自己发明的容差。
 //   - **`errorResult="true"` 的 resultNode 不豁免**（TCK 的「期望错误/未知结果」用例）：
 //     判据是"没算出具体值" —— null 或抛错都算过，**给出具体值才是真错**。
 //     ⚠️ 早期注释曾写成「一律 IGNORED」，与代码不符（2026-09-26 已订正，以代码为准）。
@@ -194,23 +194,49 @@ function significantDigits(n) {
 }
 
 /**
- * ★ 十进制精度对齐 —— **不是**浮点容差（`Q27` 的红线并没有被突破）
+ * ★ 官方口径：decimal 的数字比较**限定精度** —— 绝对差 `< 1e-8`
+ *
+ * 源码实证（四处同值，均为 `expected.subtract(actual).abs().compareTo(P) < 0`）：
+ *  - `runners/dmn-tck-runner-drools/.../CompareValuesUtil.java:11`
+ *  - `runners/dmn-tck-runner-camunda/.../CamundaTCKTest.java:68`
+ *  - `runners/dmn-tck-runner-camunda-dmn-scala/.../DmnScalaTCKTest.java:71`
+ *  - `runners/dmn-tck-runner-quantumdmn/.../FeelValueComparator.java:31`
+ *    全部 `NUMBER_COMPARISON_PRECISION = new BigDecimal("0.00000001")`。
+ *
+ * 官方**明文**口径（issue #609，2023-06-27 已关闭）：非 Java 实现者（dmntk，Rust）
+ * 提交了一批"小数点精度"相关补丁，维护者答复：
+ *   「decimal 的相等是 **by convention**……参照 drools 源码，把比较限制到第九位小数，
+ *     两个 decimal 不必**严格**相等，equal enough 即可。没必要为各家 BigDecimal 实现
+ *     在第 30 位的差异追着尾巴跑」—— 并**拒绝修改用例**。
+ *
+ * ⚠️ 这不是 Q27 反对的东西：Q27 反对的是 dmn-elements 私人脚本里
+ *    `max(1e-8, |e|*1e-9)` 那种**随期望值放大**的相对容差；
+ *    官方口径是**纯绝对** 1e-8 —— 对 2778 这种量级，比前者**更严**。
+ */
+const OFFICIAL_NUMBER_PRECISION = 1e-8;
+/** 仅供**取证/自检**：`--tolerance 1e-10` 可验证"本包离官方口径还有多少余量"。
+ *  门禁口径恒为上面的 `1e-8`（官方值），不因这个参数改变。 */
+const NUMBER_PRECISION = Number(arg('tolerance', String(OFFICIAL_NUMBER_PRECISION)));
+
+/**
+ * ★ 十进制精度对齐 —— 尊重 TCK 自己声明的序列化精度（**不是**浮点容差）
  *
  * TCK 的期望值按 **decimal 语义**序列化，它给出的**有效位数就是它声明的精度**：
  * 0008 写 `2778.69354943277`（15 位）、0040 写 `2878.6935494327668`（17 位），
  * 而两者是**同一个公式、同一组输入** —— 只是生成者截断到不同位数。
- * 超出该位数的比较没有意义：那几位 TCK 自己就没给，任何实现都不可能"精确匹配"。
+ * 超出该位数的比较没有意义：那几位 TCK 自己就没给。
  *
- * ⚠️ 与 dmn-elements 的 `max(1e-8, |e|*1e-9)` 有**本质区别**：
- *   那个容差与期望值精度无关，会把 `3.4685` 和 `3.469` 也算对；
- *   这里对齐的位数**由 TCK 自己给出** —— 差一个末位（`3.4686` vs `3.4685`）照样判失败。
- *
- * 另注：期望值给满 17 位（double 最短往返）时，对齐等价于恒等比较，行为不变。
+ * 但对齐**只能消化"位数差异"，消化不了"生成路径差异"** —— TCK 里混着
+ * decimal 路径与 double 路径产出的期望值（见 `known-gaps.md` §2.1），两者末位
+ * 可差到 1e-11 量级，那正是官方 runner 用 1e-8 兜住的部分。
  */
 function sameNumber(a, e) {
   if (Object.is(a, e)) return true;
   if (!Number.isFinite(a) || !Number.isFinite(e)) return false;
-  return Object.is(Number(a.toPrecision(significantDigits(e))), e);
+  // ① TCK 声明的序列化精度（对齐到它给出的有效位数；差一个末位仍然可能判失败）
+  if (Object.is(Number(a.toPrecision(significantDigits(e))), e)) return true;
+  // ② 官方 runner 口径：绝对差 < 1e-8（见上方注释，源码 + issue #609 双重依据）
+  return Math.abs(a - e) < NUMBER_PRECISION;
 }
 
 function valuesEqual(a, b) {
