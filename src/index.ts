@@ -54,7 +54,7 @@ export type { WriteOptions } from './xml/writer.js';
 
 // --- 求值 ---
 export { evaluateDecision, evaluateAll, indexModel, resultName } from './engine/drg.js';
-export type { DecisionResult, ModelIndex, TraceEntry } from './engine/drg.js';
+export type { DecisionResult, ModelIndex, TraceEntry, ImportBinding, IndexOptions } from './engine/drg.js';
 export { evaluateExpression } from './engine/expression.js';
 export type { EvalScope } from './engine/expression.js';
 

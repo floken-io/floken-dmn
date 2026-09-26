@@ -46,6 +46,43 @@ export interface ModelIndex {
    * 由 `itemDefinitions` 派生，随索引一起建好 —— 求值时不再重算。
    */
   typeSpecs: Record<string, TypeSpec>;
+  /**
+   * 已解析的 `<import>`（按前缀名限定引用：`myimport.Say Hello(...)` /
+   * `typeRef="myimport.tPerson"` / `a.person.name`）。**未给 `resolveImport` 时为空**。
+   */
+  imports: ImportBinding[];
+}
+
+/**
+ * 一个 `<import>` 解析出来的绑定。
+ *
+ * ★ 被导入模型的元素会**并入**宿主索引（`byId` / `byName` / `itemDefinitions` …），
+ *   于是 `href="<被导入命名空间>#id"` 直接就能引用到（TCK 0089 甚至写错了命名空间段，
+ *   只靠 `#` 后的 id 命中）。这里额外记一份「前缀名 → 元素表」，供**限定引用**使用。
+ */
+export interface ImportBinding {
+  /** `<import name="…">` —— 限定前缀（可含空格，如 `Model B`） */
+  name: string;
+  namespace: string;
+  /** 被导入模型里的 DRG 元素：绑定名 → 元素 */
+  elements: Map<string, DmnElement>;
+}
+
+/**
+ * 建索引时的可选项。
+ *
+ * ★ **为什么必须有个 `resolveImport` 回调**：本库的入口是 **XML 字符串 / 已解析的
+ *   definitions**，它**没有文件上下文**，无从知道"另一个模型在哪"。所以"去哪儿读"
+ *   只能由调用方回答 —— TCK 运行器按 `locationURI` 读同目录文件，没有 `locationURI`
+ *   时按 `namespace` 扫同目录的 `.dmn`（TCK 0086 / 0089 都是这种写法）。
+ */
+export interface IndexOptions {
+  /**
+   * 解析一个 `<import>`：返回被导入模型的 `definitions`（通常是
+   * `readDmn(xml).definitions`）。返回 `null`/`undefined` 表示解析不出来 ——
+   * 该导入被跳过，引用它的 href 会照旧报 `DMN_MODEL_MISSING_REFERENCE`。
+   */
+  resolveImport?: (imp: DmnElement) => unknown;
 }
 
 function walkAll(root: DmnElement, visit: (el: DmnElement) => void): void {
@@ -58,7 +95,12 @@ function walkAll(root: DmnElement, visit: (el: DmnElement) => void): void {
   }
 }
 
-export function indexModel(definitions: DmnElement): ModelIndex {
+export function indexModel(definitions: DmnElement, options?: IndexOptions): ModelIndex {
+  return buildIndex(definitions, options, new Map());
+}
+
+/** 递归建索引（含 `<import>` 的传递展开）；`byNamespace` 防循环导入 */
+function buildIndex(definitions: DmnElement, options: IndexOptions | undefined, byNamespace: Map<string, ModelIndex>): ModelIndex {
   const byId = new Map<string, DmnElement>();
   const byName = new Map<string, DmnElement>();
   const byVariable = new Map<string, DmnElement>();
@@ -66,6 +108,7 @@ export function indexModel(definitions: DmnElement): ModelIndex {
   const inputData: DmnElement[] = [];
   const bkms: DmnElement[] = [];
   const itemDefinitions = new Map<string, DmnElement>();
+  const imports: ImportBinding[] = [];
 
   walkAll(definitions, (el) => {
     if (typeof el.$id === 'string' && !byId.has(el.$id)) byId.set(el.$id, el);
@@ -82,7 +125,96 @@ export function indexModel(definitions: DmnElement): ModelIndex {
     else if (el.$type === 'BusinessKnowledgeModel') bkms.push(el);
   });
 
-  return { byId, byName, byVariable, decisions, inputData, bkms, itemDefinitions, typeSpecs: buildTypeSpecs(itemDefinitions) };
+  const ns = typeof definitions.namespace === 'string' ? definitions.namespace : '';
+  if (ns) byNamespace.set(ns, { byId, byName, byVariable, decisions, inputData, bkms, itemDefinitions, typeSpecs: {}, imports });
+
+  /*
+   * ★ `<import>` 的展开（DMN 1.5 §7.2）。
+   *
+   * 三件事，缺一件 TCK 那 7 条都过不去：
+   *  ① **并入宿主索引**：`byId` 合进来，`href="<被导入 ns>#id"` 才命中
+   *     （TCK 1160 的 `requiredInput href="…A#_B498…"`、0089 的 `…#_96df…`）；
+   *  ② **限定名**：`itemDefinitions` 加 `前缀.类型名`（0086 的 `typeRef="myimport.tPerson"`）、
+   *     `byName` 加 `前缀.元素名`；
+   *  ③ **前缀绑定**：`前缀` 绑成一个 context，成员是该模型的 DRG 元素值
+   *     （0086 的 `myimport.Say Hello(...)`、0089 的 `Model B.Evaluating Say Hello`、
+   *      1160 的 `a.person.name`）。
+   *
+   * ⚠️ 传递导入（0089：Model_B 自己还导入 modelA）：被导入模型的 **import 绑定也一并
+   *   上浮**，于是求 `Model B` 的决策时 `modelA` 也在作用域里。严格来说规范不保证跨层
+   *   可见，但 TCK 的期望值依赖于此（`"Evaluating Say Hello to: "+modelA.Greet the Person`）。
+   */
+  for (const imp of asElements(definitions.import)) {
+    const name = typeof imp.name === 'string' ? imp.name.trim() : '';
+    const namespace = typeof imp.namespace === 'string' ? imp.namespace : '';
+    const resolved = options?.resolveImport?.(imp);
+    if (!isElement(resolved)) continue;
+
+    const sub =
+      namespace && byNamespace.has(namespace)
+        ? byNamespace.get(namespace)!
+        : buildIndex(resolved, options, byNamespace);
+
+    for (const [id, el] of sub.byId) if (!byId.has(id)) byId.set(id, el);
+    for (const [k, el] of sub.byName) {
+      if (!byName.has(k)) byName.set(k, el);
+      /*
+       * ★ `<import name="">`（**空前缀**，DMN16-50 的"多导入不命名"写法，
+       *   TCK 1160 的 02-B / 02-C 就是）：只并入、**不加限定名** ——
+       *   `多了个 "."` 前缀的键没意义，而且会挤掉真正的前缀绑定。
+       */
+      if (name && !byName.has(`${name}.${k}`)) byName.set(`${name}.${k}`, el);
+    }
+    for (const [k, el] of sub.byVariable) {
+      if (!byVariable.has(k)) byVariable.set(k, el);
+      if (name && !byVariable.has(`${name}.${k}`)) byVariable.set(`${name}.${k}`, el);
+    }
+    for (const [k, d] of sub.itemDefinitions) {
+      if (!itemDefinitions.has(k)) itemDefinitions.set(k, d);
+      if (name && !itemDefinitions.has(`${name}.${k}`)) itemDefinitions.set(`${name}.${k}`, d);
+    }
+    for (const d of sub.decisions) if (!decisions.includes(d)) decisions.push(d);
+    for (const d of sub.inputData) if (!inputData.includes(d)) inputData.push(d);
+    for (const d of sub.bkms) if (!bkms.includes(d)) bkms.push(d);
+    for (const b of sub.imports) if (!imports.some((x) => x.name === b.name)) imports.push(b);
+
+    // 空前缀不建绑定（没有前缀可用，元素已按本名并入，直接引用即可）
+    if (!name) continue;
+    const elements = new Map<string, DmnElement>();
+    walkAll(resolved, (el) => {
+      if (DRG_TYPES.has(el.$type ?? '')) {
+        const n = resultName(el);
+        if (n && !elements.has(n)) elements.set(n, el);
+      }
+    });
+    if (!imports.some((x) => x.name === name)) imports.push({ name, namespace, elements });
+  }
+
+  return {
+    byId,
+    byName,
+    byVariable,
+    decisions,
+    inputData,
+    bkms,
+    itemDefinitions,
+    typeSpecs: buildTypeSpecs(itemDefinitions),
+    imports,
+  };
+}
+
+/** 可被 `<import>` 引入的 DRG 元素类型 */
+const DRG_TYPES: ReadonlySet<string> = new Set([
+  'Decision',
+  'InputData',
+  'BusinessKnowledgeModel',
+  'DecisionService',
+]);
+
+/** 属性 → 元素数组（单个元素也当成长度 1） */
+function asElements(v: unknown): DmnElement[] {
+  const arr = Array.isArray(v) ? v : v === undefined ? [] : [v];
+  return arr.filter(isElement);
 }
 
 /** 元素的绑定名：优先变量名，其次元素名，最后 id */
@@ -186,7 +318,12 @@ export function evaluateAll(
 
 function scopeOf(run: Run, definitions: DmnElement, vars: Record<string, unknown>): EvalScope {
   return {
-    vars,
+    /*
+     * ★ `<import>` 的前缀在这里并入（见 `importScopes` 的说明）。
+     *   放在**求表达式这一步**而不是 `resolveRequirements` 里，是为了按当时的作用域
+     *   重新算 —— 被导入的元素可能此刻才刚求值完。
+     */
+    vars: importScopes(vars, run, definitions),
     index: run.index,
     definitions,
     diagnostics: run.diagnostics,
@@ -524,6 +661,50 @@ function resolveRequirements(el: DmnElement, vars: Record<string, unknown>, run:
       details: { type: target.$type },
     });
   }
+}
+
+/**
+ * 把每个 `<import>` 的前缀绑成一个 **context** 后并入作用域，供限定引用使用
+ * （`myimport.Say Hello(...)`、`Model B.Evaluating Say Hello`、`a.person.name`）。
+ *
+ * ★ **DMN16-50：只绑一次就够了** —— 被导入的输入数据与"直接用名字绑进来的"是
+ *   同一个东西，`a.person` 与 `person` 必须拿到**同一个值**（TCK 1160 test-01 的
+ *   用例描述就是这个 issue）。实现上：名字已在作用域里就**直接复用那个值**，不另算。
+ *
+ * ⚠️ **必须返回新对象，不能往调用方的 `vars` 上写**：嵌套决策与被调方**共用同一个
+ *   vars 对象**，先求值的那个（1160 的 DecisionB 是 DecisionC 的 requiredDecision）
+ *   会把**尚未算出**的 `b.DecisionB` 绑成空 context 写进去；等外层决策再想绑时又被
+ *   "已存在"挡住 —— 于是 `b.DecisionB` 永远找不到，DecisionC 恒为 null。
+ *   每次按当前作用域重新算、谁求表达式谁用，就没有这个先后问题。
+ */
+function importScopes(vars: Record<string, unknown>, run: Run, definitions: DmnElement): Record<string, unknown> {
+  if (run.index.imports.length === 0) return vars;
+  const extra: Record<string, unknown> = {};
+  for (const b of run.index.imports) {
+    if (b.name === '' || b.name in vars) continue;
+    const map: Record<string, unknown> = {};
+    for (const [ename, target] of b.elements) {
+      if (ename in vars) {
+        map[ename] = vars[ename];
+        continue;
+      }
+      const tid = target.$id ?? '';
+      // 已算过 → 直接用缓存，不必重算
+      if (tid && run.results.has(tid)) {
+        map[ename] = run.results.get(tid);
+        continue;
+      }
+      // 正在求值中 → 跳过（否则撞 DMN_EVAL_CIRCULAR）；它的值由**外层**那次绑定补上
+      if (tid && run.visiting.has(tid)) continue;
+      if (target.$type === 'InputData') {
+        map[ename] = ename in run.input ? run.input[ename] : null;
+        continue;
+      }
+      map[ename] = runDecision(target, { ...vars, ...map, ...extra }, run, definitions);
+    }
+    extra[b.name] = toFeelContext(map);
+  }
+  return Object.keys(extra).length === 0 ? vars : { ...vars, ...extra };
 }
 
 /**

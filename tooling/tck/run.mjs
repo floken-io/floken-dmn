@@ -250,34 +250,76 @@ const byLabel = new Map();
 
 for (const g of groups) {
   const files = readdirSync(g.dir);
-  const dmnFile = files.find((f) => f.endsWith('.dmn'));
+  const allDmn = files.filter((f) => f.endsWith('.dmn'));
   const testFiles = files.filter((f) => /-test-.*\.xml$/.test(f)).sort();
-  if (!dmnFile || !testFiles.length) continue;
+  if (!allDmn.length || !testFiles.length) continue;
 
-  const dmnPath = join(g.dir, dmnFile);
-  let model;
-  let modelXml;
-  try {
-    modelXml = readFileSync(dmnPath, 'utf8');
-    model = dmn.readDmn(modelXml).definitions;
-  } catch (e) {
-    // 模型本身读不了（1.6 专有特性 / 未知命名空间）→ 整组记为 error
-    for (const tf of testFiles) {
-      const tc = parseXml(readFileSync(join(g.dir, tf), 'utf8'));
-      for (const _ of kids(kid(tc, 'testCases') ?? tc, 'testCase')) {
-        total += 1; errored += 1;
-        results.push({ group: g.name, level: g.level, status: 'error', reason: `模型读入失败: ${e.code ?? e.message}` });
+  /*
+   * ★ `<import>` 解析（**只有运行器有文件上下文**，库本身没有）：
+   *   ① 有 `locationURI` → 相对本模型所在目录读；
+   *   ② 没有（TCK 0086 / 0089 就是这种写法）→ 扫同目录 `*.dmn`，按
+   *      `definitions@namespace` 匹配。
+   *   读进来的模型按命名空间缓存，避免重复解析与循环导入。
+   */
+  const importCache = new Map();
+  const modelCache = new Map();
+  const resolveImport = (imp) => {
+    const ns = imp.namespace ?? '';
+    if (importCache.has(ns)) return importCache.get(ns);
+    let found = null;
+    const uri = imp.locationURI ?? '';
+    if (uri) {
+      try {
+        found = dmn.readDmn(readFileSync(join(g.dir, uri.replace(/^\.\//, '')), 'utf8')).definitions;
+      } catch { found = null; }
+    }
+    if (!found && ns) {
+      for (const f of allDmn) {
+        try {
+          const d = dmn.readDmn(readFileSync(join(g.dir, f), 'utf8')).definitions;
+          if (d && d.namespace === ns) { found = d; break; }
+        } catch { /* 读不了的跳过 */ }
       }
     }
-    continue;
-  }
-  const index = dmn.indexModel(model);
+    importCache.set(ns, found);
+    return found;
+  };
 
   for (const tf of testFiles) {
     const tcRoot = kid(parseXml(readFileSync(join(g.dir, tf), 'utf8')), 'testCases');
     if (!tcRoot) continue;
     const labels = kids(kid(tcRoot, 'labels') ?? tcRoot, 'label').map((l) => l.text ?? '');
     if (LABEL_FILTER && !labels.some((l) => l.includes(LABEL_FILTER)) && !g.name.includes(LABEL_FILTER)) continue;
+
+    /*
+     * ★ 模型必须**按测试文件**加载，不能按目录取第一个 `.dmn`：
+     *   TCK 一个目录里常放好几个模型（1160 有 A/B/C，0089 有主模型 + Model_B + Model_B2），
+     *   用哪个由该测试文件自己的 `<modelName>` 指定。取"第一个"会加载错模型 ——
+     *   1160 那 4 条一直报 `DMN_EVAL_NO_DECISION`（加载的是 A，里面没有 DecisionB）。
+     */
+    const modelName = (kid(tcRoot, 'modelName')?.text ?? '').trim();
+    const dmnFile = allDmn.includes(modelName) ? modelName : allDmn[0];
+    let model;
+    let index;
+    try {
+      if (!modelCache.has(dmnFile)) {
+        modelCache.set(dmnFile, {
+          def: dmn.readDmn(readFileSync(join(g.dir, dmnFile), 'utf8')).definitions,
+          idx: null,
+        });
+      }
+      const slot = modelCache.get(dmnFile);
+      if (slot.idx === null) slot.idx = dmn.indexModel(slot.def, { resolveImport });
+      model = slot.def;
+      index = slot.idx;
+    } catch (e) {
+      // 模型本身读不了（1.6 专有特性 / 未知命名空间）→ 该文件整份记为 error
+      for (const _ of kids(tcRoot, 'testCase')) {
+        total += 1; errored += 1;
+        results.push({ group: g.name, level: g.level, status: 'error', reason: `模型读入失败: ${e.code ?? e.message}` });
+      }
+      continue;
+    }
 
     for (const tc of kids(tcRoot, 'testCase')) {
       const tcId = tc.attrs.id ?? '';
