@@ -1,11 +1,11 @@
 {
  "total": 3467,
- "passed": 3401,
- "failed": 48,
+ "passed": 3404,
+ "failed": 45,
  "ignored": 18,
  "errored": 0,
  "scored": 3449,
- "pct": 98.6,
+ "pct": 98.7,
  "failures": [
   {
    "group": "0008-LX-arithmetic",
@@ -352,27 +352,6 @@
    "key": "0076-feel-external-java/0076-feel-external-java-test-01.xml#varargs_001/varargs_001",
    "status": "ignored",
    "reason": "TCK 需要真实 Java 类（external-java），非 FEEL 缺陷"
-  },
-  {
-   "group": "0082-feel-coercion",
-   "key": "0082-feel-coercion/0082-feel-coercion-test-01.xml#decision_bkm_002/decision_bkm_002",
-   "status": "fail",
-   "expected": "null（errorResult）",
-   "actual": "false"
-  },
-  {
-   "group": "0082-feel-coercion",
-   "key": "0082-feel-coercion/0082-feel-coercion-test-01.xml#invoke_001/invoke_001",
-   "status": "fail",
-   "expected": "null（errorResult）",
-   "actual": "false"
-  },
-  {
-   "group": "0082-feel-coercion",
-   "key": "0082-feel-coercion/0082-feel-coercion-test-01.xml#invoke_005/invoke_005",
-   "status": "fail",
-   "expected": "null（errorResult）",
-   "actual": "10"
   },
   {
    "group": "0082-feel-coercion",

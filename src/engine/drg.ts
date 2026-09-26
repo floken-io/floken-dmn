@@ -317,8 +317,15 @@ function bindParams(
     const raw = i < args.length ? args[i] : null;
     const t = types[i];
     const v = t ? coerceTypeRef(raw, t, undefined, index) : raw;
-    // 声明了类型却强制不出来 → 不适用（null 本身是合法值，故只拒绝 undefined）
-    if (t && v === undefined) return null;
+    /*
+     * ★ 声明了类型却强制不出来 → 不适用。判据必须是「**传入的不是 null，却强制成 null**」，
+     *   不能写成 `v === undefined` —— `coerceTypeRef` 失败时返回的是 `null` 不是 `undefined`
+     *   （`coerceComposite` 缺组件/缺键一律 `return null`），于是这条永远不触发：
+     *   TCK 0082 的 `bkm_001({name: "foo"})`（形参 `tNameAndAge` 缺 age）
+     *   就一路算成了 `null != null` 的 `false`，而期望是整个调用不适用 → null。
+     *   反过来，实参**本来就是** null 时不得拒绝：null 是一等合法值。
+     */
+    if (t && raw !== null && v === null) return null;
     if (name) out[name] = v === undefined ? null : v;
   }
   return out;

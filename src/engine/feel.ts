@@ -182,9 +182,17 @@ export function coerceTypeRef(
   // ⑤ 基本类型：先看是否已是
   if (isBaseTypeRef(t) && matchesBaseType(value, t)) return value;
 
-  // ③ 单例列表 ↔ 标量（双向，只解一层再递归）
+  // ③ 单例列表 ↔ 标量
   if (Array.isArray(value)) {
-    if (value.length === 1) return coerceTypeRef(value[0], typeRef, node, index);
+    /*
+     * ★ 单例解包**只解一层**（DMN 1.5 类型转换表里 `list<T> → T` 是一步转换）：
+     *   `[[10]]` 解一层是 `[10]`，它**仍是列表**、不是 number → 整个强制失败。
+     *   递归解包会一路剥到 10，于是 TCK 0082 invoke_005（`bkm_005([10])`，
+     *   body `[arg]` = `[[10]]` 声明 number）得 10 而期望 null（errorResult）。
+     */
+    if (value.length === 1 && !Array.isArray(value[0])) {
+      return coerceTypeRef(value[0], typeRef, node, index);
+    }
     return null;
   }
   if (isBaseTypeRef(t)) return tryBaseCoercion(value, t);
