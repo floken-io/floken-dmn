@@ -4,3 +4,4 @@ dist/
 coverage/
 .changeset/*.md
 !.changeset/config.json
+tsup.config.bundled_*.mjs
