@@ -8,7 +8,8 @@ import { evaluate, unaryTest, type Diagnostic as FeelDiagnostic } from 'floken-f
 import { DecisionError, type Diagnostic } from '../core/errors.js';
 
 /** 普通对象 → FEEL context（盒装 context 的结果值，与 FEEL 里 `{a: 1}` 同一种值） */
-export { toFeelContext } from 'floken-feel';
+export { toFeelContext, toFeelFunction } from 'floken-feel';
+export { isFunction } from 'floken-feel';
 
 // --------------------------------------------------------------------------
 // FEEL 委托

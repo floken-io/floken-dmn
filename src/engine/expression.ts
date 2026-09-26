@@ -4,7 +4,7 @@
 // 每种盒装表达式的全部难点都在「把结构翻译成对 FEEL 的一次次调用」。
 import { DecisionError, diag, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
-import { coerceTypeRef, evalExpression, evalUnaryTests, toFeelContext } from './feel.js';
+import { coerceTypeRef, evalExpression, evalUnaryTests, isFunction, toFeelContext, toFeelFunction } from './feel.js';
 import { evaluateDecisionTable } from './decision-table.js';
 import type { ModelIndex } from './drg.js';
 
@@ -119,7 +119,19 @@ export function evaluateExpression(
       const fnExpr = childExpression(expr) ?? (isElement(expr.expression) ? expr.expression : undefined);
       const fnName = fnExpr && fnExpr.$type === 'LiteralExpression' ? textOf(fnExpr) : '';
       const fn = fnName ? scope.vars[fnName] : fnExpr ? evaluateExpression(fnExpr, scope) : undefined;
-      if (typeof fn !== 'function') {
+      /*
+       * ★ 可调用判定**不能**写 `typeof fn === 'function'`：
+       * FEEL 的函数值是 `{ __feelFunction: true, name, call }` **对象**（BKM / FunctionDefinition
+       * 都包成这个形态，FEEL 的 `isFunction()` 也只认它）。用 typeof 判会一律落进抛错分支，
+       * 于是 Chapter 11 示例（0004-lending / 0087）的 BKM invocation 全线炸掉。
+       */
+      const invoke = (a: unknown[]): unknown => {
+        if (isFunction(fn as never)) {
+          return (fn as unknown as { call: (args: unknown[]) => unknown }).call(a);
+        }
+        return typeof fn === 'function' ? (fn as (...x: unknown[]) => unknown)(...a) : undefined;
+      };
+      if (!isFunction(fn as never) && typeof fn !== 'function') {
         throw new DecisionError({
           code: 'DMN_EVAL_UNSUPPORTED_EXPRESSION',
           message: 'invocation 的目标不是可调用的函数',
@@ -139,7 +151,15 @@ export function evaluateExpression(
       }
       // 命名实参优先：FEEL 的命名调用语义（`f(a: 1)`）
       const useNamed = Object.keys(named).length === args.length && args.length > 0;
-      return coerce(useNamed ? (fn as (a: Record<string, unknown>) => unknown)(named) : (fn as (...a: unknown[]) => unknown)(...args));
+      /*
+       * 命名调用要**按形参名表重排成位置实参**再传 —— 形参顺序在 `$args` 上
+       * （FunctionDefinition / BKM / DecisionService 都会挂）。
+       * 缺的形参补 `null`（FEEL 里 null 是一等值，抛不抛由被调方决定）。
+       */
+      const order = (fn as { $args?: readonly string[] } | undefined)?.$args;
+      const ordered =
+        useNamed && order?.length ? order.map((n) => (n in named ? named[n] : null)) : undefined;
+      return coerce(ordered ? invoke(ordered) : useNamed ? invoke([named]) : invoke(args));
     }
 
     case 'Conditional': {
@@ -271,10 +291,25 @@ function evalChildList(expr: DmnElement, key: string, scope: EvalScope): unknown
   return value;
 }
 
+/**
+ * `FunctionDefinition`（或 BKM 的 `encapsulatedLogic`）→ 形参名表 + 函数体。
+ *
+ * ★ body 就是 `expression` **本身**，不能再剥一层。
+ * `childExpression` 是为 `ChildExpression`/`TypedChildExpression`（Conditional 的三支）
+ * 准备的"剥壳"工具；FunctionDefinition 的 `expression` 直接就是 `literalExpression`，
+ * 多剥一次会得到 `undefined`，整个函数遂变成 null（TCK 0092 整组挂在这一点上）。
+ */
+export function functionParts(expr: DmnElement): { params: string[]; body?: DmnElement } {
+  const raw = expr.expression;
+  const isWrapper = isElement(raw) && (raw.$type === 'ChildExpression' || raw.$type === 'TypedChildExpression');
+  const body = isWrapper ? childExpression(raw) : isElement(raw) ? raw : undefined;
+  const params = asArray(expr.formalParameter).map((p) => (typeof p.name === 'string' ? p.name : ''));
+  return { params, ...(body ? { body } : {}) };
+}
+
 /** FunctionDefinition → FEEL 可调用（闭合作用域） */
 function makeFunction(expr: DmnElement, scope: EvalScope): unknown {
-  const body = childExpression(expr.expression);
-  const params = asArray(expr.formalParameter).map((p) => (typeof p.name === 'string' ? p.name : ''));
+  const { params, body } = functionParts(expr);
   if (!body) return null;
   const fn = (...args: unknown[]): unknown => {
     const local: Record<string, unknown> = { ...scope.vars };
@@ -283,8 +318,16 @@ function makeFunction(expr: DmnElement, scope: EvalScope): unknown {
     }
     return evaluateExpression(body, { ...scope, vars: local });
   };
-  Object.defineProperty(fn, '$args', { value: params, enumerable: false });
-  return fn;
+  /*
+   * ★ 必须包成 **FEEL 函数值**（`{ __feelFunction: true, name, call }`），不能直接给裸 JS 函数：
+   * FEEL 的 `call` 节点用 `isFunction()` 判定，裸函数过不了这一关，
+   * 于是 `decision_002_2(3)` 只会得到 `'decision_002_2' is not a function`
+   * （TCK 0092-feel-lambda 整组挂在这一点上）。
+   */
+  const f = toFeelFunction('', (...args) => fn(...args) as never);
+  // 形参名留给命名实参映射（当前 FEEL 侧尚未消费，先挂上以便后续对齐）
+  Object.defineProperty(f, '$args', { value: params, enumerable: false });
+  return f;
 }
 
 export { diag, evalUnaryTests };

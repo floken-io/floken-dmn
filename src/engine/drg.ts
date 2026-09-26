@@ -9,8 +9,8 @@
 import { DecisionError, DmnModelError, diag, type Diagnostic } from '../core/errors.js';
 import type { DmnElement } from '../xml/reader.js';
 import { isElement } from '../xml/reader.js';
-import { toFeelContext } from './feel.js';
-import { evaluateExpression, type EvalScope } from './expression.js';
+import { toFeelContext, toFeelFunction } from './feel.js';
+import { evaluateExpression, functionParts, type EvalScope } from './expression.js';
 
 /** 一次求值中的元素记录（NFR-M5：结果可解释） */
 export interface TraceEntry {
@@ -329,8 +329,9 @@ function resolveRequirements(el: DmnElement, vars: Record<string, unknown>, run:
         ...refsOf(target, 'inputData', run),
         ...refsOf(target, 'inputDecision', run),
       ].map(resultName);
-      Object.defineProperty(fn, '$args', { value: params, enumerable: false });
-      vars[name] = fn;
+      const f = toFeelFunction(name, (...args) => fn(...args) as never);
+      Object.defineProperty(f, '$args', { value: params, enumerable: false });
+      vars[name] = f;
       continue;
     }
     throw new DecisionError({
@@ -353,23 +354,40 @@ function makeInvocable(bkm: DmnElement, run: Run, definitions: DmnElement): unkn
 
   const closed: Record<string, unknown> = {};
   resolveRequirements(bkm, closed, run, definitions);
-  const expr = bkm.encapsulatedLogic;
-  const params = Array.isArray(bkm.variable)
-    ? []
-    : (isElement(bkm.encapsulatedLogic) && Array.isArray(bkm.encapsulatedLogic.formalParameter)
-        ? bkm.encapsulatedLogic.formalParameter.filter(isElement).map((p) => (typeof p.name === 'string' ? p.name : ''))
-        : []);
+  const encap = bkm.encapsulatedLogic;
+  /*
+   * ★ BKM 的 `encapsulatedLogic` **就是** `tFunctionDefinition`（DMN 1.5 XSD：
+   * `<xsd:element name="encapsulatedLogic" type="tFunctionDefinition"/>`）。
+   * 因此 `bkm(x)` = **把实参绑到 formalParameter 上求它的 body** ——
+   * 而不是"求值一次拿到函数就完事"（那样 `gtTen(i.price)` 得到的仍是个函数，
+   * 于是在 `= true` 处报 "got function and boolean"，TCK 0016/0092 一片挂在这一点上）。
+   */
+  const fd = isElement(encap) && encap.$type === 'FunctionDefinition' ? encap : undefined;
+  const { params, body } = fd
+    ? functionParts(fd)
+    : {
+        params: isElement(encap)
+          ? (Array.isArray(encap.formalParameter) ? encap.formalParameter.filter(isElement) : []).map((p) =>
+              typeof p.name === 'string' ? p.name : '',
+            )
+          : [],
+        body: isElement(encap) ? encap : undefined,
+      };
 
   const fn = (...args: unknown[]): unknown => {
     const local: Record<string, unknown> = { ...closed };
     for (const [i, name] of params.entries()) {
       if (name) local[name] = args[i];
     }
-    if (!isElement(expr)) return null;
-    return evaluateExpression(expr, scopeOf(run, definitions, local));
+    if (!body) return null;
+    return evaluateExpression(body, scopeOf(run, definitions, local));
   };
-  // feelin/feel 靠 `$args` 读形参数与名字（命名实参映射、元数校验）
-  Object.defineProperty(fn, '$args', { value: params, enumerable: false });
-  run.results.set(id, fn);
-  return fn;
+  /*
+   * ★ 同理必须包成 **FEEL 函数值**：FEEL 的 `call` 用 `isFunction()` 判定，
+   * 裸 JS 函数会被当成"不是函数"（TCK 0092 `bkm_003_1()(4)` 挂在这一点上）。
+   */
+  const f = toFeelFunction(resultName(bkm), (...args) => fn(...args) as never);
+  Object.defineProperty(f, '$args', { value: params, enumerable: false });
+  run.results.set(id, f);
+  return f;
 }
