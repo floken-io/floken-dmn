@@ -80,11 +80,24 @@ export function evaluateExpression(
         const variable = entry.variable;
         const name =
           isElement(variable) && typeof variable.name === 'string' && variable.name ? variable.name : '';
+        /*
+         * ★ **每个 entry 按自己的 `<variable typeRef>` 单独强制一次**
+         * （DMN 1.5 §7.4 的隐式转换，TCK 1157 "Implicit Conversions CE"）：
+         *   `numberList` 声明、`1` 的值 → `[1]`（标量 → 单例列表）；
+         *   `number` 声明、`[2]` 的值 → `2`（单例列表 → 标量）；
+         *   `date and time` 声明、`date("2000-12-01")` 的值 → `2000-12-01T00:00:00Z`。
+         * 只在 context 这一层按 `typeRef` 强制是不够的 —— 那管不到 entry。
+         */
+        const entryTypeRef =
+          isElement(variable) && typeof variable.typeRef === 'string' ? variable.typeRef : '';
+        const bound = entryTypeRef
+          ? coerceTypeRef(value, entryTypeRef, { id: expr.$id ?? '' }, scope.index)
+          : value;
         if (name) {
-          local[name] = value;
-          named[name] = value;
+          local[name] = bound;
+          named[name] = bound;
         } else {
-          tail = value;
+          tail = bound;
           hasTail = true;
         }
       }

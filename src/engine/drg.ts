@@ -190,6 +190,40 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
 
   resolveRequirements(decision, vars, run, definitions);
 
+  /*
+   * ★ **BKM 没有 `expression`**，只有 `encapsulatedLogic`（= `tFunctionDefinition`）。
+   *
+   * ① **无形参**的 BKM，它的**值**就是 body 的值 —— 不是一个函数。
+   *    TCK 1157 的 `To Singleton List BKM`（body `1`，声明
+   *    `functionReturningNumberList`）期望 `[1]`：body 的值再按
+   *    `functionItem.outputTypeRef` 强制一次。
+   *    不这么处理的话 `expr` 是 undefined → raw 恒为 null，三条 BKM 全塌。
+   * ② 有形参的 BKM 的值仍是**函数**（`makeInvocable`），下面不做输出强制。
+   */
+  if (decision.$type === 'BusinessKnowledgeModel') {
+    const f = makeInvocable(decision, run, definitions) as unknown as {
+      call: (args: unknown[]) => unknown;
+      params?: readonly string[];
+    };
+    const declared = isElement(decision.variable) ? decision.variable.typeRef : undefined;
+    const args = (f as unknown as { $args?: readonly string[] }).$args ?? [];
+    const raw = args.length === 0 ? f.call([]) : f;
+    const value =
+      typeof declared === 'string' && declared !== ''
+        ? coerceTypeRef(raw, declared, { id }, run.index)
+        : raw;
+    run.visiting.delete(id);
+    const bkmEntry: TraceEntry = {
+      type: decision.$type,
+      ...(id ? { id } : {}),
+      ...(typeof decision.name === 'string' ? { name: decision.name } : {}),
+      result: value,
+    };
+    run.trace.push(bkmEntry);
+    run.results.set(id, value);
+    return value;
+  }
+
   const entry: TraceEntry = { type: decision.$type, ...(id ? { id } : {}), ...(typeof decision.name === 'string' ? { name: decision.name } : {}) };
   const expr = decision.expression;
   const raw = isElement(expr)
@@ -390,7 +424,7 @@ function resolveRequirements(el: DmnElement, vars: Record<string, unknown>, run:
  */
 function makeInvocable(bkm: DmnElement, run: Run, definitions: DmnElement): unknown {
   const id = bkm.$id ?? '';
-  const cached = run.results.get(id);
+  const cached = run.results.get(`${id}#fn`);
   if (cached !== undefined) return cached;
 
   const closed: Record<string, unknown> = {};
@@ -438,6 +472,11 @@ function makeInvocable(bkm: DmnElement, run: Run, definitions: DmnElement): unkn
    */
   const f = toFeelFunction(resultName(bkm), (...args) => fn(...args) as never);
   Object.defineProperty(f, '$args', { value: params, enumerable: false });
-  run.results.set(id, f);
+  /*
+   * ★ 函数缓存的键**必须**与 `run.results` 的决策值缓存分开：
+   *   `runDecision(bkm)` 记的是**值**（无形参时 = body 的值），这里记的是**函数**，
+   *   共用同一个 id 会让先被别的决策 require 过的 BKM 在被直接求值时返回函数。
+   */
+  run.results.set(`${id}#fn`, f);
   return f;
 }

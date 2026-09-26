@@ -4,7 +4,7 @@
 //  1. 把字符串 + 变量字典交给 `floken-feel`（边界第 2 条：不许把 dmn 元素对象塞进去）；
 //  2. 把 `floken-feel` 的结构化错误包装成 `DMN_EVAL_FEEL`（保留 cause，不吞异常 —— §5.6）；
 //  3. DMN `typeRef` → FEEL 值的类型强制（决策表输入/输出列的声明类型）。
-import { evaluate, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic } from 'floken-feel';
+import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic } from 'floken-feel';
 import { DecisionError, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
 
@@ -150,7 +150,23 @@ export function coerceTypeRef(
 
   // ④ 复合类型（含集合）
   const def = index?.itemDefinitions?.get(typeRef);
-  if (def) return coerceComposite(value, def, index, 0);
+  if (def) {
+    /*
+     * ★ `functionItem` 声明的是**函数类型**，它的 `outputTypeRef` 是**结果**类型。
+     *
+     * 于是「BKM 的 variable.typeRef」在 BKM **无形参**时不描述函数、而描述它的值：
+     *   `To Singleton List BKM` 声明 `functionReturningNumberList`，body 是 `1`
+     *   → 按 `outputTypeRef = numberList` 强制 → `[1]`（TCK 1157）。
+     * 反过来，值**就是**函数时不强制（函数的输出类型由**调用时**校验，不是这里）。
+     */
+    const fnItem = def.functionItem;
+    if (isElement(fnItem)) {
+      const output = typeof fnItem.outputTypeRef === 'string' ? fnItem.outputTypeRef : '';
+      if (!output || isFunctionLike(value)) return value;
+      return coerceTypeRef(value, output, node, index);
+    }
+    return coerceComposite(value, def, index, 0);
+  }
 
   // ⑤ 基本类型：先看是否已是
   if (isBaseTypeRef(t) && matchesBaseType(value, t)) return value;
@@ -235,6 +251,11 @@ function isContextLike(v: unknown): boolean {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/** 值是否是个"可调用的东西"（FEEL 函数值或裸 JS 函数） */
+function isFunctionLike(v: unknown): boolean {
+  return typeof v === 'function' || isFunction(v as never);
+}
+
 function getMember(v: unknown, name: string): unknown {
   if (v && typeof v === 'object' && (v as { __feelContext?: unknown }).__feelContext === true) {
     return (v as { get?: (k: string) => unknown }).get?.(name) ?? null;
@@ -285,7 +306,16 @@ function tryBaseCoercion(value: unknown, typeRef: string): unknown {
       const t = value as { __feelTemporal?: unknown; kind?: string } | null;
       if (t?.__feelTemporal === true && t.kind === 'date') {
         try {
-          return evaluate('date and time(v, time(0, 0, 0))', { v: value }).value ?? null;
+          /*
+           * ★ **`date` 隐含 UTC**（TCK 1157 "From Date To Date and Time" 期望
+           *   `2000-01-02T00:00:00Z`，不是 `2000-01-02T00:00:00`）。
+           *
+           *   故第 4 个实参必须给一个**零偏移**：`time(0,0,0,duration("PT0H"))` 会带
+           *   `+00:00`，经 `zoneSuffix` 归一成 `Z`。只写 `time(0,0,0)` 是不带偏移的
+           *   本地时间 —— 与"date 是 UTC 上的一天"不是一回事，`.time offset` 与
+           *   和别的 dateTime 相减都会跟着错。
+           */
+          return evaluate('date and time(v, time(0, 0, 0, duration("PT0H")))', { v: value }).value ?? null;
         } catch {
           return null;
         }
