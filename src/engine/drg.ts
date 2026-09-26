@@ -10,7 +10,7 @@ import type { TypeSpec } from 'floken-feel';
 import { DecisionError, DmnModelError, diag, type Diagnostic } from '../core/errors.js';
 import type { DmnElement } from '../xml/reader.js';
 import { isElement } from '../xml/reader.js';
-import { buildTypeSpecs, coerceTypeRef, toFeelContext, toFeelFunction } from './feel.js';
+import { buildTypeSpecs, coerceTypeRef, toFeelContext, toFeelFunction, type FeelErrorMode } from './feel.js';
 import { evaluateExpression, functionParts, type EvalScope } from './expression.js';
 
 /** 一次求值中的元素记录（NFR-M5：结果可解释） */
@@ -252,6 +252,8 @@ interface Run {
   input: Record<string, unknown>;
   /** 默认表达式语言（definitions 的 expressionLanguage） */
   expressionLanguage?: string | undefined;
+  /** ★ 透传 `floken-feel` 的 `errorMode`（默认 `undefined` = `'null'`） */
+  errorMode?: FeelErrorMode | undefined;
   /**
    * ★ >0 时**绕过** `results` 缓存（既不读也不写）。
    * 决策服务**带实参**调用时，它的输出决策必须按当次实参重算 ——
@@ -268,7 +270,7 @@ export function evaluateDecision(
   definitions: DmnElement,
   id: string,
   input: Record<string, unknown>,
-  opts: { index?: ModelIndex } = {},
+  opts: { index?: ModelIndex; errorMode?: FeelErrorMode } = {},
 ): DecisionResult {
   const index = opts.index ?? indexModel(definitions);
   const target = index.byId.get(id) ?? index.byVariable.get(id) ?? index.byName.get(id);
@@ -290,6 +292,7 @@ export function evaluateDecision(
     diagnostics: [],
     input: { ...input },
     ...(el === undefined ? {} : { expressionLanguage: el }),
+    ...(opts.errorMode === undefined ? {} : { errorMode: opts.errorMode }),
     fresh: 0,
   };
 
@@ -328,6 +331,7 @@ function scopeOf(run: Run, definitions: DmnElement, vars: Record<string, unknown
     definitions,
     diagnostics: run.diagnostics,
     ...(run.expressionLanguage === undefined ? {} : { expressionLanguage: run.expressionLanguage }),
+    ...(run.errorMode === undefined ? {} : { errorMode: run.errorMode }),
   };
 }
 

@@ -43,27 +43,47 @@
 ### 0.2 dmn 调 feel 用哪种模式（★ 2026-09-26 夜实证）
 
 **用普通模式**（`evaluate` / `unaryTest`，`errorMode: 'null'`），**不是** `evaluateStrict`。
-两条调用点都在 `src/engine/feel.ts`（`evalExpression` / `evalUnaryTests`），**硬编码、无开关**。
+两条调用点在 `src/engine/feel.ts`（`evalExpression` / `evalUnaryTests`）；
+`errorMode` 已**对外透传**（`decide(xml, id, input, { errorMode })`，默认不设 = `'null'`）。
 
-为什么是普通模式 —— 不是"宽容以求过"，而是 **DMN 规范里 null 是正常结果、不是错误**：
+为什么**默认**是普通模式 —— 不是"宽容以求过"，而是 **DMN 规范里 null 是正常结果、不是错误**：
 参数/类型不符 → `null`（unknown），只有"结果无定义"才抛
 （`05-feel` §12 第六轮曾改成抛错、严格口径 +62，核对 DMN §10.3.2.13.1 与 feelin/Camunda/Drools 后
 **主动回退**，那批 `errorResult` 用例定性为 spec-divergence）。
 
-**实证对照**（临时改 `errorMode:'throw'` + 重建跑一遍，随后已 `git checkout` 恢复）：
+**实证对照**（临时把 `errorMode` 默认改 `'throw'` + 重建跑一遍，随后恢复）：
 
 | 模式 | A 口径 | 差异 |
 |---|---|---|
-| 普通（`errorMode:'null'`，现状） | **3449/3449** | — |
+| 普通（`errorMode:'null'`，默认） | **3449/3449** | — |
 | 严格（`errorMode:'throw'`） | 3448/3449 | `0006-join#001` 失败 |
 
-唯一那条失败正说明问题：表达式
-`DeptTable[number = EmployeeTable[name=LastName].deptNum[1]].manager[1]`
-的 filter 比较里含 null → 规范给 **unknown（null）**，严格模式却把它当错误抛出
-（同分支见 `evaluator.ts`：`不可比较 / 为 null → 未知（errorMode:'throw' 下抛，TCK 0071 的 3 条）`）。
+**唯一那条失败的真正原因**（抓到的异常，不是猜的）：
 
-> ⚠️ **待定**：`decide` / `evaluateDecision` 目前**不向调用方暴露** `errorMode`，
-> 需要"把未知当错误"的场景（如设计器实时校验）拿不到。是否加开关待用户拍板。
+```
+cause.code = FEEL_EVAL_ARG_TYPE
+cause.msg  = Function '=' expects a values of the same type on both sides
+             for parameter 'operands' but got function and number
+expression = DeptTable[number = EmployeeTable[name=LastName].deptNum[1]].manager[1]
+```
+
+即 **filter 内的**某一次比较类型不符 → 默认模式下**那一项 unknown（不命中）、整条表达式照常出结果**
+（TCK 期望 `"Smith"`，普通模式确实给出 `"Smith"`）；严格模式下**这一次局部 unknown 就把整条打掉**。
+所以 `'throw'` 不是"更严格"，而是**在 filter / 局部求值这类场景会误伤** —— 它把"某一项不命中"
+放大成了"整条无结果"。
+
+> ⚠️ 订正：本节初稿把这条写成「filter 比较含 null」是**错的**。实测 `1 > null` 在两种模式下
+> 都是 `null`（不抛），含 null 的比较根本不会触发 `'throw'`（见 `test/basic.test.ts` ⑦ 钉死）。
+
+**设计器实时校验该走哪条通道**：**用默认模式的 `diagnostics`，不要用 `'throw'`**。
+实测默认模式下 `MissingVar` → `value: null` + 诊断 `{code:'FEEL_EVAL_NO_VARIABLE', start:0, end:10}`
+（**带定位**）、`substring(1,2)` → `FEEL_EVAL_ARG_TYPE`；
+抛异常只能报**第一个**错且丢掉 `value`，诊断列表能一次列出全部。
+这一点与 Node 生态的做法一致：**bpmn-io 的实时校验是独立 API
+`@bpmn-io/feel-lint` 的 `lintExpression(expr, {dialect, builtins, variables})`**，
+不是给求值器加严格开关。（对照 `bpmn-moddle`：`Reader` 底层默认 `lax:false`，
+`fromXML` 覆盖成 `lax:true` 且 `assign({lax:true}, options)` 允许调用方再覆盖 ——
+"底层严、facade 宽、可覆盖"的三层范式。）
 
 ⚠️ 别和 TCK 的两种 resultNode 判定形态搞混：`<expected>` = 比期望值；
 `errorResult="true"` = 期望「没结果」（null 或抛错都算过）。后者**不豁免**，是必须兑现的断言

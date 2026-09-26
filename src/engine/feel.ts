@@ -4,13 +4,33 @@
 //  1. 把字符串 + 变量字典交给 `floken-feel`（边界第 2 条：不许把 dmn 元素对象塞进去）；
 //  2. 把 `floken-feel` 的结构化错误包装成 `DMN_EVAL_FEEL`（保留 cause，不吞异常 —— §5.6）；
 //  3. DMN `typeRef` → FEEL 值的类型强制（决策表输入/输出列的声明类型）。
-import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic, type TypeSpec } from 'floken-feel';
+import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic, type EvaluateOptions, type TypeSpec } from 'floken-feel';
 import { DecisionError, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
 
 /** 普通对象 → FEEL context（盒装 context 的结果值，与 FEEL 里 `{a: 1}` 同一种值） */
 export { toFeelContext, toFeelFunction } from 'floken-feel';
 export { isFunction } from 'floken-feel';
+
+/**
+ * ★ FEEL 的**错误模式**（透传 `floken-feel` 的 `errorMode`，不新增概念）：
+ *  - `'null'`（默认）：未知/类型不符 → `null` **并附诊断**。`decide` 的返回值里能拿到
+ *    带 `start`/`end` 定位的诊断列表 —— 这是**设计器实时校验**该用的通道；
+ *  - `'throw'`：未知也抛 `DMN_EVAL_FEEL`。**fail-fast**，第一个错就中断、拿不到结果值。
+ *
+ * ⚠️ `'throw'` 不是"更严格所以更好"：DMN 规范里 null 传播是**正常结果、不是错误**。
+ * 实测 A 口径在 `'throw'` 下会掉 1 条（`0006-join#001`：filter 比较含 null → 规范给
+ * unknown，严格模式误当错误）。**默认不要开**，见 `known-gaps.md` §0.2。
+ */
+export type FeelErrorMode = NonNullable<EvaluateOptions['errorMode']>;
+
+/** 组装传给 `floken-feel` 的 options（可选字段一律 `?: T | undefined`） */
+function feelOptions(types: Record<string, TypeSpec> | undefined, errorMode: FeelErrorMode | undefined): EvaluateOptions {
+  const opts: EvaluateOptions = {};
+  if (types) opts.types = types;
+  if (errorMode) opts.errorMode = errorMode;
+  return opts;
+}
 
 // --------------------------------------------------------------------------
 // FEEL 委托
@@ -50,9 +70,10 @@ export function evalExpression(
   context: Record<string, unknown>,
   node?: { id?: string; path?: string },
   types?: Record<string, TypeSpec>,
+  errorMode?: FeelErrorMode,
 ): FeelOutcome {
   try {
-    const r = evaluate(src, context, types ? { types } : {});
+    const r = evaluate(src, context, feelOptions(types, errorMode));
     return { value: r.value, warnings: toDiagnostics(r.warnings) };
   } catch (e) {
     throw new DecisionError({
@@ -76,9 +97,10 @@ export function evalUnaryTests(
   context: Record<string, unknown>,
   node?: { id?: string; path?: string },
   types?: Record<string, TypeSpec>,
+  errorMode?: FeelErrorMode,
 ): { value: boolean | null; warnings: Diagnostic[] } {
   try {
-    const r = unaryTest(src, { ...context, '?': value }, types ? { types } : {});
+    const r = unaryTest(src, { ...context, '?': value }, feelOptions(types, errorMode));
     return { value: r.value === true ? true : r.value === false ? false : null, warnings: toDiagnostics(r.warnings) };
   } catch (e) {
     throw new DecisionError({

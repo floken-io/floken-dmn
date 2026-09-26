@@ -59,7 +59,7 @@ export function evaluateDecisionTable(
     const ie = clause.inputExpression;
     const text = isElement(ie) ? entryText(ie) : '';
     if (!text) return null;
-    const raw = evalExpression(text, scope.vars, { id: clause.$id ?? '', path: 'inputClause.inputExpression' }, scope.index.typeSpecs);
+    const raw = evalExpression(text, scope.vars, { id: clause.$id ?? '', path: 'inputClause.inputExpression' }, scope.index.typeSpecs, scope.errorMode);
     scope.diagnostics.push(...raw.warnings);
     return coerceTypeRef(raw.value, isElement(ie) ? ie.typeRef : undefined, { id: clause.$id ?? '' });
   });
@@ -86,7 +86,7 @@ function matchesRule(rule: DmnElement, inputValues: unknown[], scope: EvalScope)
   for (const [idx, entry] of entries.entries()) {
     const text = entryText(entry);
     if (!text || text === '-') continue; // 无关条目：恒命中
-    const r = evalUnaryTests(text, inputValues[idx], scope.vars, { id: rule.$id ?? '', path: `rule.inputEntry[${idx}]` }, scope.index.typeSpecs);
+    const r = evalUnaryTests(text, inputValues[idx], scope.vars, { id: rule.$id ?? '', path: `rule.inputEntry[${idx}]` }, scope.index.typeSpecs, scope.errorMode);
     scope.diagnostics.push(...r.warnings);
     if (r.value !== true) return false;
   }
@@ -106,7 +106,7 @@ function ruleOutput(rule: DmnElement, outputs: DmnElement[], scope: EvalScope): 
 function entryValue(entry: unknown, typeRef: unknown, scope: EvalScope): unknown {
   const text = entryText(entry);
   if (!text) return null;
-  const r = evalExpression(text, scope.vars, { path: 'outputEntry' }, scope.index.typeSpecs);
+  const r = evalExpression(text, scope.vars, { path: 'outputEntry' }, scope.index.typeSpecs, scope.errorMode);
   scope.diagnostics.push(...r.warnings);
   return coerceTypeRef(r.value, typeRef);
 }
@@ -190,7 +190,7 @@ function sortByPriority(
   const priorities = outputs.map((output) => {
     const text = entryText(output.outputValues);
     if (!text) return null;
-    const r = evalExpression(`[${text}]`, scope.vars, { path: 'outputClause.outputValues' }, scope.index.typeSpecs);
+    const r = evalExpression(`[${text}]`, scope.vars, { path: 'outputClause.outputValues' }, scope.index.typeSpecs, scope.errorMode);
     scope.diagnostics.push(...r.warnings);
     return Array.isArray(r.value) ? r.value : null;
   });

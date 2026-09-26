@@ -45,7 +45,11 @@ function run(script, args, attempts = 5) {
   let lastErr;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      return execFileSync(NODE, [script, ...args], { stdio: 'pipe', cwd: root });
+      /*
+       * ★ `stdio` 必须显式给：Windows 上 **stdin 接管道**会让嵌套子进程起不来（EBUSY）。
+       *   只写 `'pipe'` 等于连 stdin 也接管 —— 稳定复现、重试多少次都没用。
+       */
+      return execFileSync(NODE, [script, ...args], { stdio: ['ignore', 'pipe', 'pipe'], cwd: root });
     } catch (e) {
       lastErr = e;
       const msg = String(e && e.message ? e.message : e);

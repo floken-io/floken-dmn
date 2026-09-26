@@ -127,3 +127,77 @@ describe('命名空间双向兼容（Q35）', () => {
     expect(() => readDmn(bfeel)).toThrowError(expect.objectContaining({ code: 'DMN_MODEL_UNSUPPORTED_FEATURE' }));
   });
 });
+
+describe('errorMode 透传（★ 默认不变：null + 诊断；可选 fail-fast）', () => {
+  const ns = 'https://www.omg.org/spec/DMN/20230324/MODEL/';
+  /** 单决策 literalExpression 模型 */
+  const lit = (text: string) =>
+    `<definitions xmlns="${ns}" id="d1" name="d"><decision id="dec" name="dec">` +
+    `<literalExpression><text>${text}</text></literalExpression></decision></definitions>`;
+  /** 单规则决策表：输入 x，输入条目里故意用**类型不符**的调用 */
+  const table = (entry: string) =>
+    `<definitions xmlns="${ns}" id="d1" name="d"><decision id="dec" name="dec"><decisionTable id="dt">` +
+    `<input id="i1"><inputExpression id="ie1" typeRef="number"><text>x</text></inputExpression></input>` +
+    `<output id="o1"/><rule id="r1"><inputEntry id="e1"><text>${entry}</text></inputEntry>` +
+    `<outputEntry id="oe1"><text>"hit"</text></outputEntry></rule></decisionTable></decision></definitions>`;
+
+  it('① 默认：未知 → null + 带定位的诊断（设计器校验走这条）', () => {
+    const r = decide(lit('MissingVar'), 'dec');
+    expect(r.value).toBeNull();
+    const d = r.diagnostics.find((x) => x.code === 'FEEL_EVAL_NO_VARIABLE');
+    expect(d).toBeDefined();
+    expect(d?.start).toBe(0);
+    expect(d?.end).toBe(10); // 'MissingVar'.length
+    expect(d?.message).toContain('MissingVar');
+  });
+
+  it('② 默认：类型不符 → null + ARG_TYPE 诊断，不抛', () => {
+    const r = decide(lit('substring(1, 2)'), 'dec');
+    expect(r.value).toBeNull();
+    expect(r.diagnostics.map((d) => d.code)).toContain('FEEL_EVAL_ARG_TYPE');
+  });
+
+  it('③ errorMode:"throw"：类型不符 → 抛 DMN_EVAL_FEEL（fail-fast）', () => {
+    expect(() => decide(lit('substring(1, 2)'), 'dec', {}, { errorMode: 'throw' })).toThrowError(
+      expect.objectContaining({ code: 'DMN_EVAL_FEEL' }),
+    );
+  });
+
+  it('④ 抛出的异常保留 feel 的 cause（不吞，NFR-M4）', () => {
+    let caught: any;
+    try {
+      decide(lit('substring(1, 2)'), 'dec', {}, { errorMode: 'throw' });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught?.code).toBe('DMN_EVAL_FEEL');
+    expect(caught?.details?.expression).toBe('substring(1, 2)');
+    expect(caught?.cause?.code).toBe('FEEL_EVAL_ARG_TYPE');
+  });
+
+  it('⑤ 显式 "null" 与默认完全同形', () => {
+    expect(decide(lit('substring(1, 2)'), 'dec', {}, { errorMode: 'null' })).toEqual(decide(lit('substring(1, 2)'), 'dec'));
+  });
+
+  it('⑥ 开关对决策表的 unary tests 同样生效', () => {
+    expect(decide(table('= substring(1, 2)'), 'dec', { x: 5 }).value).toBeNull();
+    expect(() => decide(table('= substring(1, 2)'), 'dec', { x: 5 }, { errorMode: 'throw' })).toThrowError(
+      expect.objectContaining({ code: 'DMN_EVAL_FEEL' }),
+    );
+  });
+
+  it('⑦ ★ 为什么默认必须是 "null"：filter 内的局部 unknown 不能打掉整条', () => {
+    // filter 对每项求值，某一项类型不符 → 该项 unknown（不命中），**整条表达式仍要出结果**。
+    // 这正是 TCK 0006-join#001 在 errorMode:'throw' 下失败的原因（抛 ARG_TYPE，拿不到 "Smith"）。
+    const src = '[1,2,3][item = substring(1, 2)][1]';
+    expect(decide(lit(src), 'dec').value).toBeNull(); // 默认：不命中 → null（不抛）
+    expect(() => decide(lit(src), 'dec', {}, { errorMode: 'throw' })).toThrowError(
+      expect.objectContaining({ code: 'DMN_EVAL_FEEL' }),
+    );
+  });
+
+  it('⑧ 正常表达式不受开关影响（throw 下也不误报）', () => {
+    expect(decide(lit('1 + 1'), 'dec', {}, { errorMode: 'throw' }).value).toBe(2);
+    expect(decide(table('&gt; 3'), 'dec', { x: 5 }, { errorMode: 'throw' }).value).toBe('hit');
+  });
+});

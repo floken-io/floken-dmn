@@ -4,7 +4,7 @@
 // 每种盒装表达式的全部难点都在「把结构翻译成对 FEEL 的一次次调用」。
 import { DecisionError, diag, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
-import { coerceTypeRef, evalExpression, evalUnaryTests, isFunction, toFeelContext, toFeelFunction } from './feel.js';
+import { coerceTypeRef, evalExpression, evalUnaryTests, isFunction, toFeelContext, toFeelFunction, type FeelErrorMode } from './feel.js';
 import { evaluateDecisionTable } from './decision-table.js';
 import type { ModelIndex } from './drg.js';
 
@@ -15,6 +15,8 @@ export interface EvalScope {
   definitions: DmnElement;
   diagnostics: Diagnostic[];
   expressionLanguage?: string | undefined;
+  /** ★ 透传 `floken-feel` 的 `errorMode`（默认 `undefined` = `'null'`），见 `feel.js` 的类型注释 */
+  errorMode?: FeelErrorMode | undefined;
 }
 
 const asArray = (v: unknown): DmnElement[] => (Array.isArray(v) ? v.filter(isElement) : isElement(v) ? [v] : []);
@@ -44,7 +46,7 @@ export function evaluateExpression(
     case 'LiteralExpression': {
       const text = textOf(expr);
       if (!text) return null;
-      const r = evalExpression(text, scope.vars, { id: expr.$id ?? '', path: 'literalExpression.text' }, scope.index.typeSpecs);
+      const r = evalExpression(text, scope.vars, { id: expr.$id ?? '', path: 'literalExpression.text' }, scope.index.typeSpecs, scope.errorMode);
       scope.diagnostics.push(...r.warnings);
       return coerce(r.value);
     }

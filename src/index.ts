@@ -61,6 +61,16 @@ export type { EvalScope } from './engine/expression.js';
 export interface DecideOptions {
   /** 预建索引（重复调用同一模型时省一次遍历） */
   index?: ReturnType<typeof indexModel>;
+  /**
+   * ★ 透传 `floken-feel` 的 **`errorMode`**（默认不设 = `'null'`）：
+   *  - `'null'`（默认）：未知/类型不符 → `null` + 诊断（返回值 `diagnostics` 里带定位）；
+   *  - `'throw'`：未知也抛 `DMN_EVAL_FEEL`（fail-fast，第一个错就中断）。
+   *
+   * ⚠️ `'throw'` 不等于"更正确"：DMN 规范里 null 传播是正常结果。实测 A 口径在它下面
+   * 会掉 1 条（`0006-join#001`）。**设计器实时校验请用 `diagnostics`，不要用 `'throw'`**
+   * —— 抛异常只能报第一个错，诊断列表能一次列出全部。见 `known-gaps.md` §0.2。
+   */
+  errorMode?: 'null' | 'throw' | undefined;
 }
 
 /**
@@ -75,7 +85,10 @@ export function decide(
   opts: DecideOptions = {},
 ): DecisionResult {
   const { definitions, diagnostics } = readDmn(xml);
-  const result = evaluateDecision(definitions, decisionId, input, opts.index ? { index: opts.index } : {});
+  const opts2: { index?: ReturnType<typeof indexModel>; errorMode?: 'null' | 'throw' } = {};
+  if (opts.index) opts2.index = opts.index;
+  if (opts.errorMode) opts2.errorMode = opts.errorMode;
+  const result = evaluateDecision(definitions, decisionId, input, opts2);
   return { ...result, diagnostics: [...diagnostics, ...result.diagnostics] };
 }
 
