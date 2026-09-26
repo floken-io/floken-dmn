@@ -37,7 +37,8 @@ export function evaluateExpression(
   trace?: { matchedRules?: string[]; hitPolicy?: string },
 ): unknown {
   const typeRef = expr.typeRef;
-  const coerce = (v: unknown) => coerceTypeRef(v, typeRef, { id: expr.$id ?? '' });
+  // typeRef 强制要认得 itemDefinition（复合类型 / 集合），故把模型索引一并传下去
+  const coerce = (v: unknown) => coerceTypeRef(v, typeRef, { id: expr.$id ?? '' }, scope.index);
 
   switch (expr.$type) {
     case 'LiteralExpression': {

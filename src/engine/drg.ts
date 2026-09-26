@@ -9,7 +9,7 @@
 import { DecisionError, DmnModelError, diag, type Diagnostic } from '../core/errors.js';
 import type { DmnElement } from '../xml/reader.js';
 import { isElement } from '../xml/reader.js';
-import { toFeelContext, toFeelFunction } from './feel.js';
+import { coerceTypeRef, toFeelContext, toFeelFunction } from './feel.js';
 import { evaluateExpression, functionParts, type EvalScope } from './expression.js';
 
 /** 一次求值中的元素记录（NFR-M5：结果可解释） */
@@ -38,6 +38,8 @@ export interface ModelIndex {
   decisions: DmnElement[];
   inputData: DmnElement[];
   bkms: DmnElement[];
+  /** itemDefinition 名 → 定义（typeRef 强制要用：复合类型与集合） */
+  itemDefinitions: Map<string, DmnElement>;
 }
 
 function walkAll(root: DmnElement, visit: (el: DmnElement) => void): void {
@@ -57,9 +59,13 @@ export function indexModel(definitions: DmnElement): ModelIndex {
   const decisions: DmnElement[] = [];
   const inputData: DmnElement[] = [];
   const bkms: DmnElement[] = [];
+  const itemDefinitions = new Map<string, DmnElement>();
 
   walkAll(definitions, (el) => {
     if (typeof el.$id === 'string' && !byId.has(el.$id)) byId.set(el.$id, el);
+    if (el.$type === 'ItemDefinition' && typeof el.name === 'string' && !itemDefinitions.has(el.name)) {
+      itemDefinitions.set(el.name, el);
+    }
     if (typeof el.name === 'string' && el.$type !== 'InformationItem' && !byName.has(el.name)) byName.set(el.name, el);
     const variable = el.variable;
     if (isElement(variable) && typeof variable.name === 'string' && !byVariable.has(variable.name)) {
@@ -70,7 +76,7 @@ export function indexModel(definitions: DmnElement): ModelIndex {
     else if (el.$type === 'BusinessKnowledgeModel') bkms.push(el);
   });
 
-  return { byId, byName, byVariable, decisions, inputData, bkms };
+  return { byId, byName, byVariable, decisions, inputData, bkms, itemDefinitions };
 }
 
 /** 元素的绑定名：优先变量名，其次元素名，最后 id */
@@ -186,9 +192,22 @@ function runDecision(decision: DmnElement, vars: Record<string, unknown>, run: R
 
   const entry: TraceEntry = { type: decision.$type, ...(id ? { id } : {}), ...(typeof decision.name === 'string' ? { name: decision.name } : {}) };
   const expr = decision.expression;
-  const value = isElement(expr)
+  const raw = isElement(expr)
     ? evaluateExpression(expr, scopeOf(run, definitions, vars), entry)
     : null;
+  /*
+   * ★ **决策层**也要按 `variable.typeRef` 强制一次。
+   * 只强制表达式自带的 `typeRef` 是不够的 —— 那个属性是**可选**的，
+   * 而 TCK 0082 全是只在 `<variable typeRef="…"/>` 上声明的：
+   * `decision_007` 值 `["foo"]` 声明 string → `"foo"`（单例解包）、
+   * `decision_001` 值 `2` 声明 string → `null`（number→string 不做）、
+   * `decision_005` 值 `{name:"foo"}` 声明 tNameAndAge → `null`（缺 age 组件）。
+   */
+  const declared = isElement(decision.variable) ? decision.variable.typeRef : undefined;
+  const value =
+    typeof declared === 'string' && declared !== ''
+      ? coerceTypeRef(raw, declared, { id }, run.index)
+      : raw;
 
   run.visiting.delete(id);
   entry.result = value;
@@ -204,6 +223,28 @@ function refsOf(el: DmnElement, key: string, run: Run): DmnElement[] {
   for (const item of Array.isArray(v) ? v : [v]) {
     const t = isElement(item) ? run.index.byId.get(hrefId(item.href) ?? '') : undefined;
     if (t) out.push(t);
+  }
+  return out;
+}
+
+/**
+ * 把实参绑到形参上，并**按形参的 `typeRef` 强制**。
+ * @returns 绑定表；任一形参强制失败 → `null`（调用不适用）
+ */
+function bindParams(
+  params: readonly string[],
+  types: readonly (string | undefined)[],
+  args: readonly unknown[],
+  index: ModelIndex,
+): Record<string, unknown> | null {
+  const out: Record<string, unknown> = {};
+  for (const [i, name] of params.entries()) {
+    const raw = i < args.length ? args[i] : null;
+    const t = types[i];
+    const v = t ? coerceTypeRef(raw, t, undefined, index) : raw;
+    // 声明了类型却强制不出来 → 不适用（null 本身是合法值，故只拒绝 undefined）
+    if (t && v === undefined) return null;
+    if (name) out[name] = v === undefined ? null : v;
   }
   return out;
 }
@@ -374,11 +415,20 @@ function makeInvocable(bkm: DmnElement, run: Run, definitions: DmnElement): unkn
         body: isElement(encap) ? encap : undefined,
       };
 
+  const paramTypes = (fd ? fd.formalParameter : isElement(encap) ? encap.formalParameter : undefined) as
+    | DmnElement[]
+    | DmnElement
+    | undefined;
+  const types = (Array.isArray(paramTypes) ? paramTypes : paramTypes ? [paramTypes] : [])
+    .filter(isElement)
+    .map((p) => (typeof p.typeRef === 'string' ? p.typeRef : undefined));
+
   const fn = (...args: unknown[]): unknown => {
-    const local: Record<string, unknown> = { ...closed };
-    for (const [i, name] of params.entries()) {
-      if (name) local[name] = args[i];
-    }
+    const bound = bindParams(params, types, args, run.index);
+    // ★ 实参不符合形参声明类型 → **整个调用不适用**，结果是 null；
+    //   不是把 null 传进去继续算（TCK 0082 decision_bkm_002：期望 null，不是 `null != null` 的 false）。
+    if (bound === null) return null;
+    const local: Record<string, unknown> = { ...closed, ...bound };
     if (!body) return null;
     return evaluateExpression(body, scopeOf(run, definitions, local));
   };
