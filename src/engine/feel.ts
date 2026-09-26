@@ -204,15 +204,29 @@ function coerceComposite(value: unknown, def: DmnElement, index: TypeIndex | und
   );
 
   if (isCollection) {
-    const list = Array.isArray(value) ? value : [value]; // 标量 → 单例列表（TCK 1157）
-    const out: unknown[] = [];
-    for (const item of list) {
-      const one = coerceComposite(item, { ...def, isCollection: false }, index, depth + 1);
-      if (one === null) return null;
-      out.push(one);
+      const list = Array.isArray(value) ? value : [value]; // 标量 → 单例列表（TCK 1157）
+      const out: unknown[] = [];
+      for (const item of list) {
+        /*
+         * ★ **元素本身是 null** 与 **元素强制失败** 结果都是 `null`，但语义相反，必须分开：
+         *   - 元素就是 null → 保留成 null。null 是 FEEL 的一等「未知」值，不是"这个元素不存在"。
+         *     TCK 1161 的 `BList`（声明 `stringList`、三个输入数据都没给）期望
+         *     `[null, null, null]`，不是 `null`。
+         *   - 元素非 null 却强制出 null = **转换失败** → 整个列表 `null`。
+         *     TCK 0082 decision_003 `[1,2,"foo"]` 声明 `tNumberList` 期望 null（errorResult），
+         *     decision_006_a / literal_004 / decision_bkm_004_a 的 `"foo"` → `tNumberList` 同理。
+         *   一刀切（把两者都当失败、或都当未知）会各自打掉上面一半的用例。
+         */
+        if (item === null || item === undefined) {
+          out.push(null);
+          continue;
+        }
+        const one = coerceComposite(item, { ...def, isCollection: false }, index, depth + 1);
+        if (one === null || one === undefined) return null;
+        out.push(one);
+      }
+      return out;
     }
-    return out;
-  }
 
   // 非集合：内层基本类型走普通强制
   const inner = typeof def.typeRef === 'string' ? def.typeRef : '';
