@@ -22,8 +22,8 @@
     "verify": "node tooling/verify.mjs",
     "tck": "node tooling/tck/run.mjs",
     "changeset": "changeset",
-    "release": "pnpm build && pnpm verify && changeset publish",
-    "prepublishOnly": "pnpm build && pnpm verify"
+    "release": "npm run build && npm run verify && changeset publish",
+    "prepublishOnly": "npm run build && npm run verify"
   },
   "dependencies": {
     "floken-feel": ">=0.0.0 <1.0.0"
