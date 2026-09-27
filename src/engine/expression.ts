@@ -15,7 +15,7 @@ export interface EvalScope {
   definitions: DmnElement;
   diagnostics: Diagnostic[];
   expressionLanguage?: string | undefined;
-  /** ★ 透传 `@floken/feel` 的 `errorMode`（默认 `undefined` = `'null'`），见 `feel.js` 的类型注释 */
+  /** ★ 透传 `@floken-io/feel` 的 `errorMode`（默认 `undefined` = `'null'`），见 `feel.js` 的类型注释 */
   errorMode?: FeelErrorMode | undefined;
 }
 

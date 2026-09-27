@@ -187,16 +187,16 @@ const walkDir = (d) =>
     e.isDirectory() ? walkDir(join(d, e.name)) : [join(d, e.name)],
   );
 
-// (a) tsup 必须把 temporal-polyfill / @floken/feel 列为 external
+// (a) tsup 必须把 temporal-polyfill / @floken-io/feel 列为 external
 const tsupCfgPath = join(root, 'tsup.config.ts');
 const tsupCfg = existsSync(tsupCfgPath) ? readFileSync(tsupCfgPath, 'utf8') : '';
-const mustExternal = ['temporal-polyfill', '@floken/feel'].filter(
+const mustExternal = ['temporal-polyfill', '@floken-io/feel'].filter(
   (p) => !new RegExp(`['"]${p.replace('.', '\\.')}['"]`).test(tsupCfg),
 );
 if (mustExternal.length) {
   bad('check:deps', 'tsup.config.ts 未 external 化: ' + mustExternal.join(', '));
 } else {
-  ok('check:deps', 'temporal-polyfill / @floken/feel 已 external');
+  ok('check:deps', 'temporal-polyfill / @floken-io/feel 已 external');
 }
 
 // (b) 产物中 temporal-polyfill 只能出现在 import 语句里（即外部引用，而非内联实现）

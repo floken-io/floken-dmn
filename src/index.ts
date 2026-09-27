@@ -1,18 +1,18 @@
-// @floken/dmn —— DMN 1.5 决策引擎。
+// @floken-io/dmn —— DMN 1.5 决策引擎。
 //
 // 分层（AGENTS.md §4.1）：`core` ← 域（`spec` / `xml` / `engine`）← 入口。
 //
 // 依赖（Q35 / Q38）：
-//  - 表达式求值**全部**委托 `@floken/feel`（`04-dmn` §14 边界第 1 条）；
+//  - 表达式求值**全部**委托 `@floken-io/feel`（`04-dmn` §14 边界第 1 条）；
 //  - XML 读写自研，不引第三方 XML 库（Q38）；
 //  - 权威元模型版本 **DMN 1.5**，导入兼容 1.3/1.4/1.5/1.6，导出恒写 1.5（Q35）。
-import '@floken/feel/temporal'; // ★ 延迟能力档（§5.8）：DMN 全量档必须含时态语义
+import '@floken-io/feel/temporal'; // ★ 延迟能力档（§5.8）：DMN 全量档必须含时态语义
 
 import { readDmn } from './xml/reader.js';
 import { evaluateDecision, indexModel, resultName, type DecisionResult } from './engine/drg.js';
 import { DecisionError } from './core/errors.js';
 
-export const PACKAGE = '@floken/dmn' as const;
+export const PACKAGE = '@floken-io/dmn' as const;
 
 export {
   DecisionError,
@@ -62,7 +62,7 @@ export interface DecideOptions {
   /** 预建索引（重复调用同一模型时省一次遍历） */
   index?: ReturnType<typeof indexModel>;
   /**
-   * ★ 透传 `@floken/feel` 的 **`errorMode`**（默认不设 = `'null'`）：
+   * ★ 透传 `@floken-io/feel` 的 **`errorMode`**（默认不设 = `'null'`）：
    *  - `'null'`（默认）：未知/类型不符 → `null` + 诊断（返回值 `diagnostics` 里带定位）；
    *  - `'throw'`：未知也抛 `DMN_EVAL_FEEL`（fail-fast，第一个错就中断）。
    *

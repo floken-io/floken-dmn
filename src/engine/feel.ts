@@ -1,19 +1,19 @@
 // 表达式求值委托 —— **本包不得自己实现任何求值**（`04-dmn` §14 边界第 1 条）。
 //
 // 只做三件事：
-//  1. 把字符串 + 变量字典交给 `@floken/feel`（边界第 2 条：不许把 dmn 元素对象塞进去）；
-//  2. 把 `@floken/feel` 的结构化错误包装成 `DMN_EVAL_FEEL`（保留 cause，不吞异常 —— §5.6）；
+//  1. 把字符串 + 变量字典交给 `@floken-io/feel`（边界第 2 条：不许把 dmn 元素对象塞进去）；
+//  2. 把 `@floken-io/feel` 的结构化错误包装成 `DMN_EVAL_FEEL`（保留 cause，不吞异常 —— §5.6）；
 //  3. DMN `typeRef` → FEEL 值的类型强制（决策表输入/输出列的声明类型）。
-import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic, type EvaluateOptions, type TypeSpec } from '@floken/feel';
+import { evaluate, isFunction, toFeelContext, unaryTest, type Diagnostic as FeelDiagnostic, type EvaluateOptions, type TypeSpec } from '@floken-io/feel';
 import { DecisionError, type Diagnostic } from '../core/errors.js';
 import { isElement, type DmnElement } from '../xml/reader.js';
 
 /** 普通对象 → FEEL context（盒装 context 的结果值，与 FEEL 里 `{a: 1}` 同一种值） */
-export { toFeelContext, toFeelFunction } from '@floken/feel';
-export { isFunction } from '@floken/feel';
+export { toFeelContext, toFeelFunction } from '@floken-io/feel';
+export { isFunction } from '@floken-io/feel';
 
 /**
- * ★ FEEL 的**错误模式**（透传 `@floken/feel` 的 `errorMode`，不新增概念）：
+ * ★ FEEL 的**错误模式**（透传 `@floken-io/feel` 的 `errorMode`，不新增概念）：
  *  - `'null'`（默认）：未知/类型不符 → `null` **并附诊断**。`decide` 的返回值里能拿到
  *    带 `start`/`end` 定位的诊断列表 —— 这是**设计器实时校验**该用的通道；
  *  - `'throw'`：未知也抛 `DMN_EVAL_FEEL`。**fail-fast**，第一个错就中断、拿不到结果值。
@@ -24,7 +24,7 @@ export { isFunction } from '@floken/feel';
  */
 export type FeelErrorMode = NonNullable<EvaluateOptions['errorMode']>;
 
-/** 组装传给 `@floken/feel` 的 options（可选字段一律 `?: T | undefined`） */
+/** 组装传给 `@floken-io/feel` 的 options（可选字段一律 `?: T | undefined`） */
 function feelOptions(types: Record<string, TypeSpec> | undefined, errorMode: FeelErrorMode | undefined): EvaluateOptions {
   const opts: EvaluateOptions = {};
   if (types) opts.types = types;
@@ -61,7 +61,7 @@ function toDiagnostics(warnings: readonly FeelDiagnostic[] | undefined): Diagnos
  * 求值一个 FEEL 表达式。
  *
  * 错误通道（§5.1）：
- *  - **语法/API 契约类**由 `@floken/feel` 直接抛 → 这里包装成 `DMN_EVAL_FEEL`
+ *  - **语法/API 契约类**由 `@floken-io/feel` 直接抛 → 这里包装成 `DMN_EVAL_FEEL`
  *    （带 `node` 定位与 `cause`，不吞、不转 null —— NFR-M4）；
  *  - **语义降级**（变量缺失等）随 `warnings` 返回，不抛。
  */
@@ -80,7 +80,7 @@ export function evalExpression(
       code: 'DMN_EVAL_FEEL',
       message: 'FEEL 表达式求值失败',
       ...(node ? { node } : {}),
-      hint: '见 cause 中的 @floken/feel 错误码与定位',
+      hint: '见 cause 中的 @floken-io/feel 错误码与定位',
       details: { expression: src },
       cause: e,
     });
@@ -107,7 +107,7 @@ export function evalUnaryTests(
       code: 'DMN_EVAL_FEEL',
       message: 'FEEL unary tests 求值失败',
       ...(node ? { node } : {}),
-      hint: '见 cause 中的 @floken/feel 错误码与定位',
+      hint: '见 cause 中的 @floken-io/feel 错误码与定位',
       details: { expression: src },
       cause: e,
     });
@@ -402,7 +402,7 @@ const MAX_SPEC_DEPTH = 8;
 const ANY_SPEC: TypeSpec = { kind: 'named', name: 'Any', start: 0, end: 0 };
 
 /**
- * 把模型的 `itemDefinition` 表翻译成 `@floken/feel` 的**类型规格表**。
+ * 把模型的 `itemDefinition` 表翻译成 `@floken-io/feel` 的**类型规格表**。
  *
  * `instance of t255` / `instance of tNumberList` 这类表达式只有在拿到模型定义时才判得
  * 了 —— 名字对 FEEL 而言只是一个 `named` 规格，查表在宿主手里（TCK 0070 整组靠它）。

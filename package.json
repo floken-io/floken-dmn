@@ -1,5 +1,5 @@
 {
-  "name": "@floken/dmn",
+  "name": "@floken-io/dmn",
   "version": "0.0.0",
   "description": "DMN 1.5 decision engine (DRG + decision tables) for floken",
   "repository": { "type": "git", "url": "git+https://github.com/floken-io/floken-dmn.git" },
@@ -30,7 +30,7 @@
     "prepublishOnly": "npm run build && npm run verify"
   },
   "dependencies": {
-    "@floken/feel": ">=0.0.0 <1.0.0"
+    "@floken-io/feel": ">=0.0.0 <1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
