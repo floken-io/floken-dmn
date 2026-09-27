@@ -1,6 +1,6 @@
 {
   "name": "@floken-io/dmn",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "DMN 1.5 decision engine (DRG + decision tables) for floken",
   "repository": { "type": "git", "url": "git+https://github.com/floken-io/floken-dmn.git" },
   "bugs": { "url": "https://github.com/floken-io/floken-dmn/issues" },
