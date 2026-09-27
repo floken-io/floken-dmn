@@ -11,7 +11,7 @@
 //     判据是"没算出具体值" —— null 或抛错都算过，**给出具体值才是真错**。
 //     ⚠️ 早期注释曾写成「一律 IGNORED」，与代码不符（2026-09-26 已订正，以代码为准）。
 //
-// A 口径（完整 DMN TCK，走 DRG）≠ `floken-feel` 的 B 口径（FEEL-only）—— 两套数字禁止互相引用。
+// A 口径（完整 DMN TCK，走 DRG）≠ `@floken/feel` 的 B 口径（FEEL-only）—— 两套数字禁止互相引用。
 //
 // 用法：
 //   node tooling/tck/run.mjs [--dir <TestCases>] [--level 2|3] [--label <关键字>] [--verbose] [--json]
@@ -48,7 +48,7 @@ if (!existsSync(DIST)) {
   process.exit(2);
 }
 const dmn = await import(pathToFileURL(DIST).href);
-const feel = await import('floken-feel');
+const feel = await import('@floken/feel');
 
 // ---------------------------------------------------------------------------
 // 极简 XML → 树（运行器自用；本包的正式解析器在 dist 里，但这里需要读 testcase 命名空间）
@@ -519,7 +519,7 @@ if (AS_JSON) {
   process.exit(0);
 }
 
-console.log('=== floken-dmn · DMN TCK（A 口径：完整 DRG）===');
+console.log('=== @floken/dmn · DMN TCK（A 口径：完整 DRG）===');
 console.log(`语料：${TCK_DIR}`);
 console.log(`语料版本：${verStr}（按模型 xmlns **实测**，${[...nsVer.values()].reduce((s, v) => s + v, 0)} 份模型）  获取日期：${new Date().toISOString().slice(0, 10)}`);
 console.log('');

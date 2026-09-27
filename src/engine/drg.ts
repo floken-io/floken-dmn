@@ -6,7 +6,7 @@
 //  - BKM / DecisionService 绑成**可调用**，其作用域是封闭的（调用方的输入不泄漏进去）。
 //
 // 本实现是同步的（FEEL 求值是同步的），不引入 callback 形态。
-import type { TypeSpec } from 'floken-feel';
+import type { TypeSpec } from '@floken/feel';
 import { DecisionError, DmnModelError, diag, type Diagnostic } from '../core/errors.js';
 import type { DmnElement } from '../xml/reader.js';
 import { isElement } from '../xml/reader.js';
@@ -252,7 +252,7 @@ interface Run {
   input: Record<string, unknown>;
   /** 默认表达式语言（definitions 的 expressionLanguage） */
   expressionLanguage?: string | undefined;
-  /** ★ 透传 `floken-feel` 的 `errorMode`（默认 `undefined` = `'null'`） */
+  /** ★ 透传 `@floken/feel` 的 `errorMode`（默认 `undefined` = `'null'`） */
   errorMode?: FeelErrorMode | undefined;
   /**
    * ★ >0 时**绕过** `results` 缓存（既不读也不写）。

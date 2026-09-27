@@ -1,4 +1,4 @@
-# Known gaps（floken-dmn）
+# Known gaps（@floken/dmn）
 
 > 与 `floken-feel/known-gaps.md` 同源的强制交付物：每一条「不算通过」都要登记理由，
 > 且 TCK 语料（CC BY-SA）**不随包分发**。
@@ -25,7 +25,7 @@
 > 结论：**数据源没算错**。3467 与早期文档里的 "3495" 是**不同计法**（3495 是 `dmn-elements`
 > README 引用的另一口径，含它自己那套计数规则），本包只认自己跑出来的可复算数字。
 
-> ⚠️ A 口径 ≠ `floken-feel` 的 B 口径（FEEL-only，计分基数 1995）—— 两套数字**禁止互相引用**。
+> ⚠️ A 口径 ≠ `@floken/feel` 的 B 口径（FEEL-only，计分基数 1995）—— 两套数字**禁止互相引用**。
 
 ### 0.1 两条判据（★ 别只盯分数）
 

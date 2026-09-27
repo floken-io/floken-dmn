@@ -1,4 +1,4 @@
-# floken-dmn
+# @floken/dmn
 
 DMN **1.5** 决策引擎：让「规则」独立于流程图存在。
 
@@ -12,8 +12,8 @@ DMN **1.5** 决策引擎：让「规则」独立于流程图存在。
   依据：四份 XSD 原件实测 OMG **只增不减**（零删除类型/属性/枚举）。
   ⚠️ 遇 1.6 专有特性（`importType="ONNX"`、B-FEEL `…/20240513/B-FEEL/`）**明确报错**，不静默降级。
 - FEEL 表达式语言 URI = `https://www.omg.org/spec/DMN/20230324/FEEL/`（取自 `DMN15.xsd` 官方默认值；与官方 TCK 语料实测版本一致）。
-- 表达式求值委托 `floken-feel`（全量档 + temporal），**不自研任何求值**。
-- 经 `decisionHandler` SPI **旁挂** `floken-engine`，不进主链。
+- 表达式求值委托 `@floken/feel`（全量档 + temporal），**不自研任何求值**。
+- 经 `decisionHandler` SPI **旁挂** `@floken/engine`，不进主链。
 
 ## 现状（2026-09-26 · M0 收官）
 
@@ -33,7 +33,7 @@ DMN **1.5** 决策引擎：让「规则」独立于流程图存在。
 ## 用法
 
 ```ts
-import { decide, decideOnly } from 'floken-dmn';
+import { decide, decideOnly } from '@floken/dmn';
 
 // 指定决策入口
 const r = decide(xml, 'decision_001', { applicantAge: 18, risk: 'LOW' });

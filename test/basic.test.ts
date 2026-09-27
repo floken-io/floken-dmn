@@ -10,7 +10,7 @@ const CL2 = join(TCK, 'compliance-level-2', '0100-feel-constants', '0100-feel-co
 const CL3 = join(TCK, 'compliance-level-2', '0105-feel-math', '0105-feel-math.dmn');
 const hasTck = existsSync(TCK);
 
-describe('floken-dmn 元模型规模（文档口径自证）', () => {
+describe('@floken/dmn 元模型规模（文档口径自证）', () => {
   it('DMN 1.5 = 55 类型 / 121+ 自有属性', () => {
     expect(SPEC_STATS.dmnTypes).toBe(55);
     expect(SPEC_STATS.dmnOwnProperties).toBeGreaterThanOrEqual(121);
@@ -67,7 +67,7 @@ describe('读写往返', () => {
   });
 });
 
-describe('DRG 求值（委托 floken-feel）', () => {
+describe('DRG 求值（委托 @floken/feel）', () => {
   it('literal expression：CL2 0100', () => {
     if (!hasTck) return;
     const xml = readFileSync(CL2, 'utf8');

@@ -15,7 +15,7 @@ export interface EvalScope {
   definitions: DmnElement;
   diagnostics: Diagnostic[];
   expressionLanguage?: string | undefined;
-  /** ★ 透传 `floken-feel` 的 `errorMode`（默认 `undefined` = `'null'`），见 `feel.js` 的类型注释 */
+  /** ★ 透传 `@floken/feel` 的 `errorMode`（默认 `undefined` = `'null'`），见 `feel.js` 的类型注释 */
   errorMode?: FeelErrorMode | undefined;
 }
 
@@ -62,7 +62,7 @@ export function evaluateExpression(
      *   ①最后一个 entry **没有** `<variable>` → 整个 context 的值就是**它**的值；
      *   ②否则 → 值就是**这个 context 本身**（只有带名字的 entry 进结果）。
      *
-     * 之前一律返回最后一个 entry，于是 `{resolve A: "A"}` 被压成 `"A"`，
+     * 只返回最后一个 entry 的话，`{resolve A: "A"}` 会被压成 `"A"`，
      * 嵌套引用（`decision A 2.1` 取 `decision A 1`）随之全线断掉（TCK 0034 整组）。
      *
      * 另：entry 之间**顺序可见** —— 后一个 entry 能引用前一个的绑定（DRG 作用域），
@@ -348,7 +348,7 @@ function makeFunction(expr: DmnElement, scope: EvalScope): unknown {
    *
    *   TCK 0030「named function invocation」与 0031「fn invocation named parameters」
    *   的 `multiplyFn` 都是**装箱 `<functionDefinition>`**（不是 FEEL 的 `function(a,b)`
-   *   字面量，字面量的形参名走另一条路已通），此前正是漏了这两个参数的其中一头。
+   *   字面量，字面量的形参名走另一条路已通），否则会漏掉这两个参数的其中一头。
    */
   const f = toFeelFunction('', (...args) => fn(...args) as never, params);
   Object.defineProperty(f, '$args', { value: params, enumerable: false });
