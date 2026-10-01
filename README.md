@@ -30,6 +30,34 @@ const r2 = decideOnly(xml, { applicantAge: 18 });
 
 低层 API：`readDmn` / `writeDmn`（XML ↔ 模型）、`indexModel` / `evaluateDecision` / `evaluateAll`（DRG 编排）、`evaluateExpression`（单表达式）。
 
+## 接入流程引擎（`businessRuleTask`）
+
+`createDecisionHandler()` 把一份 `.dmn` 包装成 `@floken-io/engine` 的 `decisionHandler` SPI：
+
+```ts
+import { createEngine } from '@floken-io/engine';
+import { createDecisionHandler } from '@floken-io/dmn';
+
+createEngine({
+  decisionHandler: createDecisionHandler(xml, { decision: '住宿标准表' }),
+});
+```
+
+决策结果会**并入流程变量**，可以直接驱动网关分支：
+
+| `as` | 落点 | 适用 |
+|---|---|---|
+| `'merge'`（默认） | 结果是对象 → 逐键并入；是标量 → 挂到**决策变量名**下 | 决策表多列输出 |
+| `'node'` | `{ [节点 id]: 结果 }` | 与引擎 `scriptTask` 的落点对齐 |
+| 自定义函数 | 宿主完全接管 | 只要其中一列之类 |
+
+**不 import `@floken-io/engine`**：本包只做**形状兼容**，不引入对引擎的类型依赖 ——
+装不装 dmn，引擎都一样完整（依赖方向是单向旁挂）。
+
+**诊断**：DMN 的 `diagnostics` 在引擎侧没有出口（`decisionHandler` 只返回变量补丁），
+故提供 `onDiagnostics` 回调；**不传则诊断不落地**。DMN 里「null 传播」是正常结果，
+不是一个错误，所以默认不告警。
+
 ## 版本口径
 
 - 元模型权威版本 = **DMN 1.5**（命名空间 `https://www.omg.org/spec/DMN/20230324/MODEL/`）
@@ -62,7 +90,7 @@ IGNORED 清单与判定规则见 [`known-gaps.md`](./known-gaps.md)。TCK 语料
 | [`@floken-io/feel`](https://www.npmjs.com/package/@floken-io/feel) | FEEL 表达式语言 |
 | [`@floken-io/moddle`](https://www.npmjs.com/package/@floken-io/moddle) | BPMN 2.0 模型与 XML 转换 |
 | [`@floken-io/dmn`](https://www.npmjs.com/package/@floken-io/dmn) | DMN 1.5 决策引擎（本包） |
-| `@floken-io/engine` | 流程内核与审批动作（开发中） |
+| [`@floken-io/engine`](https://www.npmjs.com/package/@floken-io/engine) | 流程内核与审批动作 |
 | `@floken-io/designer` | 流程画布与审批配置面板（开发中） |
 
 ## 开发

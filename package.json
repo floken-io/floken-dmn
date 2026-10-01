@@ -1,6 +1,6 @@
 {
   "name": "@floken-io/dmn",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "DMN 1.5 decision engine (DRG + decision tables) for floken",
   "repository": { "type": "git", "url": "git+https://github.com/floken-io/floken-dmn.git" },
   "bugs": { "url": "https://github.com/floken-io/floken-dmn/issues" },
@@ -37,7 +37,9 @@
     "typescript": "5.9.3",
     "tsup": "8.5.1",
     "vitest": "5.0.2",
-    "@changesets/cli": "3.0.3"
+    "vite": "8.3.1",
+    "@changesets/cli": "3.0.3",
+    "@floken-io/engine": ">=0.0.1 <1.0.0"
   },
   "license": "Apache-2.0"
 }
