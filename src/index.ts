@@ -52,6 +52,15 @@ export type { DmnElement, ReadResult } from './xml/reader.js';
 export { writeDmn } from './xml/writer.js';
 export type { WriteOptions } from './xml/writer.js';
 
+// --- 引擎侧适配器（`businessRuleTask` 的 `decisionHandler` SPI；DMN-D4）---
+export { createDecisionHandler, createDecisionHandlerFrom } from './bridge/decision-handler.js';
+export type {
+  DecisionHandlerCtx,
+  DecisionHandlerLike,
+  DecisionHandlerOptions,
+  DecisionResultShape,
+} from './bridge/decision-handler.js';
+
 // --- 求值 ---
 export { evaluateDecision, evaluateAll, indexModel, resultName } from './engine/drg.js';
 export type { DecisionResult, ModelIndex, TraceEntry, ImportBinding, IndexOptions } from './engine/drg.js';
